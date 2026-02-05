@@ -226,10 +226,10 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
           <Html
             key={face.id}
             transform
-            occlude
             position={faceConfigs[index].position}
             rotation={faceConfigs[index].rotation}
             distanceFactor={3.2}
+            zIndexRange={[100, 0]}
             style={{
               width: '280px',
               height: '280px',

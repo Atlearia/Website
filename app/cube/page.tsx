@@ -14,8 +14,21 @@ import Link from 'next/link';
 export default function CubePage() {
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-background">
+      {/* Initial overlay that fades out */}
+      <motion.div
+        initial={{ opacity: 1 }}
+        animate={{ opacity: 0 }}
+        transition={{ duration: 1.2, delay: 0.3, ease: 'easeOut' }}
+        className="fixed inset-0 z-[100] bg-background pointer-events-none"
+      />
+
       {/* Gradient background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-surface-elevated" />
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1.5, ease: 'easeOut' }}
+        className="fixed inset-0 bg-gradient-to-br from-background via-background to-surface-elevated" 
+      />
       
       {/* Subtle grid pattern */}
       <div 
@@ -31,9 +44,9 @@ export default function CubePage() {
 
       {/* Header */}
       <motion.header
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.2 }}
+        transition={{ duration: 0.8, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
         className="fixed top-0 left-0 right-0 z-50 p-6"
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -70,9 +83,13 @@ export default function CubePage() {
 
       {/* 3D Cube Scene */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ 
+          duration: 1.2, 
+          delay: 0.3,
+          ease: 'easeOut',
+        }}
         className="fixed inset-0"
       >
         <CubeScene className="w-full h-full" />

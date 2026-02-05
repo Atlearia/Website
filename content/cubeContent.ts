@@ -30,9 +30,13 @@ export const cubeContent: CubeFaceContent[] = [
   {
     id: 'intro',
     title: 'Ning Ye',
-    subtitle: 'Software Engineer • Creator',
-    description: 'Crafting digital experiences with code and creativity. Passionate about building products that make a difference.',
-    highlight: '📍 Montreal, QC',
+    subtitle: 'Software Engineer',
+    description: 'Building innovative mobile & web experiences. Hackathon winner. Trilingual creator passionate about impactful technology.',
+    items: [
+      { label: 'Phone', value: '514.965.3579' },
+      { label: 'Location', value: 'Montreal, QC' },
+    ],
+    highlight: '🎯 Open to Co-op',
     gradient: ['#14b8a6', '#0d9488'], // Teal
   },
 
@@ -42,12 +46,12 @@ export const cubeContent: CubeFaceContent[] = [
     title: 'Education',
     subtitle: 'Concordia University',
     items: [
-      { label: 'Program', value: 'Software Engineering' },
-      { label: 'GPA', value: '4.17 / 4.30 ⭐' },
-      { label: 'Expected', value: 'Class of 2028' },
-      { label: 'Status', value: "Dean's List" },
+      { label: 'Degree', value: 'B.Eng Software' },
+      { label: 'Program', value: 'Co-op' },
+      { label: 'GPA', value: '4.17 / 4.30' },
+      { label: 'Graduation', value: '2029' },
     ],
-    highlight: '🎓 Top of Class',
+    highlight: "🎓 Dean's List",
     gradient: ['#06b6d4', '#0891b2'], // Cyan
   },
 
@@ -55,14 +59,14 @@ export const cubeContent: CubeFaceContent[] = [
   {
     id: 'skills',
     title: 'Skills',
-    subtitle: 'Technical Stack',
+    subtitle: 'Technical Expertise',
     items: [
-      { label: 'Languages', value: 'C# • Java • Dart • Python' },
-      { label: 'Mobile', value: 'Flutter • React Native' },
-      { label: 'Web', value: 'Next.js • NestJS • Spring' },
-      { label: 'Tools', value: 'Unity • Firebase • Git' },
+      { label: 'Code', value: 'C# • Java • Dart • Python' },
+      { label: 'Mobile', value: 'Flutter • Firebase' },
+      { label: 'Backend', value: 'NestJS • Spring Boot' },
+      { label: 'Frontend', value: 'Next.js • Fabric' },
     ],
-    highlight: '🌐 EN • FR • 中文',
+    highlight: '🗣 EN • FR • 中文',
     gradient: ['#8b5cf6', '#7c3aed'], // Violet
   },
 
@@ -72,12 +76,13 @@ export const cubeContent: CubeFaceContent[] = [
     title: 'Projects',
     subtitle: 'Featured Work',
     items: [
-      { label: 'ETS Mobile', value: '🥇 1st Place' },
-      { label: 'CodeJam 2024', value: 'Cross-Platform' },
-      { label: 'Game Dev', value: 'Unity Bullet-Hell' },
-      { label: 'This Site', value: 'Next.js + Three.js' },
+      { label: 'ETS Mobile 2025', value: '🥇 $1,750' },
+      { label: 'CodeJam 2024', value: 'Full-Stack App' },
+      { label: 'Bullet-Hell', value: 'Unity C#' },
+      { label: 'Portfolio', value: 'Next + Three.js' },
     ],
-    highlight: '💰 $1,750 Won',
+    description: 'Mobile apps built in 24-48hrs using Flutter, Firebase, NestJS, PocketBase',
+    highlight: '⚡ 24hr Builds',
     gradient: ['#ec4899', '#db2777'], // Pink
   },
 
@@ -85,14 +90,15 @@ export const cubeContent: CubeFaceContent[] = [
   {
     id: 'experience',
     title: 'Experience',
-    subtitle: 'Achievements & Work',
+    subtitle: 'Work & Achievements',
     items: [
-      { label: 'Hackathons', value: '2 Awards 🏆' },
-      { label: 'Best UI', value: 'ETS Challenge 2025' },
-      { label: 'Community', value: '100K+ Followers' },
-      { label: 'Content', value: 'Gaming Platform' },
+      { label: '2020-2022', value: 'Community Manager' },
+      { label: 'Instagram', value: '100K+ Followers' },
+      { label: 'Discord', value: '2K Members' },
+      { label: 'Awards', value: '1st + Best UI 🏆' },
     ],
-    highlight: '🚀 Building the Future',
+    description: 'Digital marketing & community growth for gaming content brand',
+    highlight: '📈 100K+ Reach',
     gradient: ['#f97316', '#ea580c'], // Orange
   },
 
@@ -100,13 +106,13 @@ export const cubeContent: CubeFaceContent[] = [
   {
     id: 'contact',
     title: 'Connect',
-    subtitle: "Let's Build Together",
+    subtitle: "Let's Collaborate",
     links: [
       { label: 'github.com/Atlearia', url: 'https://github.com/Atlearia', icon: 'github' },
       { label: 'linkedin.com/in/ning-ye', url: 'https://linkedin.com/in/ning-ye', icon: 'linkedin' },
       { label: 'ning.ye@mail.concordia.ca', url: 'mailto:ning.ye@mail.concordia.ca', icon: 'mail' },
     ],
-    description: 'Open to opportunities and collaborations.',
+    description: 'Open for internships, co-ops & exciting projects',
     highlight: '💬 Say Hello!',
     gradient: ['#10b981', '#059669'], // Emerald
   },
