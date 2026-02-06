@@ -10,6 +10,8 @@ import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { cubeContent, cubeVisuals } from '@/content/cubeContent';
 import { CubeFace } from './CubeFace';
+import { useCubeEntrance } from '@/hooks/useCubeEntrance';
+import { useCubeIdleFloat } from '@/hooks/useCubeIdleFloat';
 
 interface InteractiveCubeProps {
   onFaceChange?: (faceIndex: number) => void;
@@ -33,6 +35,12 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   
   const [isHovered, setIsHovered] = useState(false);
   const [activeFace, setActiveFace] = useState(0);
+
+  // Entrance "fly-in with spin" animation
+  const entrance = useCubeEntrance();
+  // Subtle idle floating motion when not dragging
+  const idleFloat = useCubeIdleFloat();
+  const groupRef = useRef<THREE.Group>(null);
 
   // Face target rotations (which rotation shows which face)
   const faceTargets: Array<[number, number]> = [
@@ -171,15 +179,41 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   }, [onFaceChange]);
 
   // Animation loop
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!meshRef.current) return;
 
-    // Smooth interpolation to target
+    // --- Entrance animation ---
+    entrance.update(delta);
+
+    // --- Idle float (active only when not dragging & entrance done) ---
+    const idleActive = !isDragging.current && entrance.isComplete.current;
+    idleFloat.update(delta, idleActive);
+
+    // --- Apply entrance transforms to the outer group ---
+    if (groupRef.current) {
+      groupRef.current.position.z = entrance.positionZ.current;
+      groupRef.current.position.y = idleFloat.positionY.current;
+      groupRef.current.position.x = idleFloat.positionX.current;
+      const s = entrance.scale.current;
+      groupRef.current.scale.set(s, s, s);
+    }
+
+    // --- Smooth interpolation to target rotation ---
     currentRotationX.current += (targetRotationX.current - currentRotationX.current) * LERP_SPEED;
     currentRotationY.current += (targetRotationY.current - currentRotationY.current) * LERP_SPEED;
 
-    meshRef.current.rotation.x = currentRotationX.current;
-    meshRef.current.rotation.y = currentRotationY.current;
+    // Apply rotation = base + entrance spin offset + idle micro-rotation
+    meshRef.current.rotation.x =
+      currentRotationX.current +
+      entrance.rotationXOffset.current +
+      idleFloat.rotationX.current;
+
+    meshRef.current.rotation.y =
+      currentRotationY.current +
+      entrance.rotationYOffset.current +
+      idleFloat.rotationY.current;
+
+    meshRef.current.rotation.z = idleFloat.rotationZ.current;
   });
 
   // Face configurations
@@ -196,7 +230,7 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   ];
 
   return (
-    <group>
+    <group ref={groupRef}>
       <mesh
         ref={meshRef}
         onPointerEnter={() => {
