@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { cubeContent, cubeVisuals } from '@/content/cubeContent';
 import { CubeFace } from './CubeFace';
 import { useCubeEntrance } from '@/hooks/useCubeEntrance';
-import { useCubeIdleFloat } from '@/hooks/useCubeIdleFloat';
+import { useCubeBreathing } from '@/hooks/useCubeBreathing';
 
 interface InteractiveCubeProps {
   onFaceChange?: (faceIndex: number) => void;
@@ -38,8 +38,8 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
 
   // Entrance "fly-in with spin" animation
   const entrance = useCubeEntrance();
-  // Subtle idle floating motion when not dragging
-  const idleFloat = useCubeIdleFloat();
+  // Organic breathing motion (base tilt + oscillation + imperfection)
+  const breathing = useCubeBreathing();
   const groupRef = useRef<THREE.Group>(null);
 
   // Face target rotations (which rotation shows which face)
@@ -185,15 +185,15 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
     // --- Entrance animation ---
     entrance.update(delta);
 
-    // --- Idle float (active only when not dragging & entrance done) ---
-    const idleActive = !isDragging.current && entrance.isComplete.current;
-    idleFloat.update(delta, idleActive);
+    // --- Breathing (active only when not dragging & entrance done) ---
+    const breathingActive = !isDragging.current && entrance.isComplete.current;
+    breathing.update(delta, breathingActive);
 
     // --- Apply entrance transforms to the outer group ---
     if (groupRef.current) {
       groupRef.current.position.z = entrance.positionZ.current;
-      groupRef.current.position.y = idleFloat.positionY.current;
-      groupRef.current.position.x = idleFloat.positionX.current;
+      groupRef.current.position.y = breathing.posY.current;
+      groupRef.current.position.x = breathing.posX.current;
       const s = entrance.scale.current;
       groupRef.current.scale.set(s, s, s);
     }
@@ -202,18 +202,20 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
     currentRotationX.current += (targetRotationX.current - currentRotationX.current) * LERP_SPEED;
     currentRotationY.current += (targetRotationY.current - currentRotationY.current) * LERP_SPEED;
 
-    // Apply rotation = base + entrance spin offset + idle micro-rotation
+    // Apply rotation = base snap + base tilt + entrance spin + breathing oscillation
     meshRef.current.rotation.x =
       currentRotationX.current +
+      breathing.baseTiltX +
       entrance.rotationXOffset.current +
-      idleFloat.rotationX.current;
+      breathing.rotX.current;
 
     meshRef.current.rotation.y =
       currentRotationY.current +
+      breathing.baseTiltY +
       entrance.rotationYOffset.current +
-      idleFloat.rotationY.current;
+      breathing.rotY.current;
 
-    meshRef.current.rotation.z = idleFloat.rotationZ.current;
+    meshRef.current.rotation.z = breathing.rotZ.current;
   });
 
   // Face configurations
