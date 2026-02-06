@@ -7,7 +7,7 @@
 // Features physics-based rotation with drag, flick, and snap interactions
 // ============================================================================
 
-import { CubeScene } from '@/components/cube';
+import { CubeScene } from '@/components/cube/CubeScene';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 

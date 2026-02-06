@@ -23,7 +23,6 @@ interface RevealProps {
   className?: string;
   once?: boolean;
   amount?: number;
-  as?: keyof JSX.IntrinsicElements;
 }
 
 const directionVariants: Record<RevealDirection, Variants> = {
@@ -60,7 +59,6 @@ export function Reveal({
   className = '',
   once = true,
   amount = 0.2,
-  as = 'div',
 }: RevealProps) {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once, amount });
@@ -95,10 +93,8 @@ export function Reveal({
         },
       };
 
-  const MotionComponent = motion[as as keyof typeof motion] as typeof motion.div;
-
   return (
-    <MotionComponent
+    <motion.div
       ref={ref}
       initial="hidden"
       animate={isInView ? 'visible' : 'hidden'}
@@ -106,7 +102,7 @@ export function Reveal({
       className={className}
     >
       {children}
-    </MotionComponent>
+    </motion.div>
   );
 }
 
@@ -169,24 +165,21 @@ export function RevealGroup({
 interface RevealItemProps {
   children: React.ReactNode;
   className?: string;
-  as?: keyof JSX.IntrinsicElements;
 }
 
 export function RevealItem({
   children,
   className = '',
-  as = 'div',
 }: RevealItemProps) {
   const prefersReducedMotion = useReducedMotion();
-  const MotionComponent = motion[as as keyof typeof motion] as typeof motion.div;
 
   return (
-    <MotionComponent
+    <motion.div
       variants={prefersReducedMotion ? reducedMotionFade : staggerChild}
       className={className}
     >
       {children}
-    </MotionComponent>
+    </motion.div>
   );
 }
 
