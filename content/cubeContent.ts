@@ -123,10 +123,10 @@ export const cubeContent: CubeFaceContent[] = [
 export const faceRotations: Record<number, [number, number, number]> = {
   0: [0, 0, 0],                    // Front
   1: [0, Math.PI, 0],              // Back
-  2: [0, Math.PI / 2, 0],          // Right
-  3: [0, -Math.PI / 2, 0],         // Left
-  4: [-Math.PI / 2, 0, 0],         // Top
-  5: [Math.PI / 2, 0, 0],          // Bottom
+  2: [0, -Math.PI / 2, 0],         // Right
+  3: [0, Math.PI / 2, 0],          // Left
+  4: [Math.PI / 2, 0, 0],          // Top
+  5: [-Math.PI / 2, 0, 0],         // Bottom
 };
 
 // Physics configuration for the cube

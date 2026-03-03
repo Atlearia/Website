@@ -14,28 +14,50 @@ import { useCubeEntrance } from '@/hooks/useCubeEntrance';
 import { useCubeBreathing } from '@/hooks/useCubeBreathing';
 
 const FACE_TARGETS: Array<[number, number]> = [
-  [0, 0],                          // Front - Intro
-  [0, Math.PI],                    // Back - Education
-  [0, Math.PI / 2],                // Right - Skills
-  [0, -Math.PI / 2],               // Left - Projects
-  [-Math.PI / 2, 0],               // Top - Experience
-  [Math.PI / 2, 0],                // Bottom - Contact
+  [0, 0],                          // Front - Intro   (face 0, +Z)
+  [0, Math.PI],                    // Back - Education (face 1, -Z)
+  [0, -Math.PI / 2],               // Right - Skills  (face 2, +X)
+  [0, Math.PI / 2],                // Left - Projects (face 3, -X)
+  [Math.PI / 2, 0],                // Top - Experience (face 4, +Y)
+  [-Math.PI / 2, 0],               // Bottom - Contact (face 5, -Y)
 ];
+
+// Each face's outward-pointing normal in cube-local space
+const FACE_NORMALS: THREE.Vector3[] = [
+  new THREE.Vector3(0, 0, 1),   // Front
+  new THREE.Vector3(0, 0, -1),  // Back
+  new THREE.Vector3(1, 0, 0),   // Right
+  new THREE.Vector3(-1, 0, 0),  // Left
+  new THREE.Vector3(0, 1, 0),   // Top
+  new THREE.Vector3(0, -1, 0),  // Bottom
+];
+
+// Direction a face must point in world-space to be visible to the camera
+const CAMERA_DIR = new THREE.Vector3(0, 0, 1);
+const _vFace = new THREE.Vector3();
 
 // Drag feel tuning
 const SENSITIVITY = 0.0035; // radians per pixel
 const DRAG_LERP_SPEED = 0.26;
 const IDLE_LERP_SPEED = 0.12;
-const MAX_PITCH = THREE.MathUtils.degToRad(90);
 const VELOCITY_SMOOTHING = 0.35;
 const SNAP_LOOKAHEAD_SECONDS = 0.18;
-const TWO_PI = Math.PI * 2;
 
-const clampPitch = (pitch: number) => THREE.MathUtils.clamp(pitch, -MAX_PITCH, MAX_PITCH);
-const nearestEquivalentAngle = (current: number, target: number) => {
-  const delta = ((target - current + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
-  return current + delta;
-};
+// World-space axes for quaternion drag
+const WORLD_X = new THREE.Vector3(1, 0, 0);
+const WORLD_Y = new THREE.Vector3(0, 1, 0);
+
+// Pre-computed quaternion targets for each face
+const FACE_TARGET_QUATS = FACE_TARGETS.map(([x, y]) =>
+  new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, 0, 'YXZ'))
+);
+
+// Reusable scratch objects (avoids GC pressure in hot paths)
+const _qDeltaX = new THREE.Quaternion();
+const _qDeltaY = new THREE.Quaternion();
+const _qScratch = new THREE.Quaternion();
+const _qOffset = new THREE.Quaternion();
+const _eScratch = new THREE.Euler();
 
 interface InteractiveCubeProps {
   onFaceChange?: (faceIndex: number) => void;
@@ -47,11 +69,9 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   const rotationGroupRef = useRef<THREE.Group>(null);
   const { gl } = useThree();
   
-  // Rotation state
-  const currentRotationX = useRef(0);
-  const currentRotationY = useRef(0);
-  const targetRotationX = useRef(0);
-  const targetRotationY = useRef(0);
+  // Rotation state (quaternion-based — avoids gimbal lock on every face)
+  const currentQuat = useRef(new THREE.Quaternion());
+  const targetQuat = useRef(new THREE.Quaternion());
   
   // Drag state
   const isDragging = useRef(false);
@@ -70,38 +90,27 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   const breathing = useCubeBreathing();
   const groupRef = useRef<THREE.Group>(null);
 
-  const findClosestFace = useCallback((rotationX: number, rotationY: number): number => {
-    let closestFace = 0;
-    let closestDistance = Infinity;
-    const normalizedCurrentY = ((rotationY % TWO_PI) + TWO_PI) % TWO_PI;
-
-    FACE_TARGETS.forEach(([targetX, targetY], index) => {
-      const normalizedTargetY = ((targetY % TWO_PI) + TWO_PI) % TWO_PI;
-      const distX = Math.abs(rotationX - targetX);
-      const distY = Math.min(
-        Math.abs(normalizedCurrentY - normalizedTargetY),
-        TWO_PI - Math.abs(normalizedCurrentY - normalizedTargetY)
-      );
-      // At the poles (top/bottom, targetX = ±π/2) every Y value shows the
-      // same face, so Y distance is irrelevant. Scale it by |cos(targetX)|:
-      // 1 for side faces (equator), ~0 for top/bottom (poles).
-      const yawRelevance = Math.abs(Math.cos(targetX));
-      const distance = distX + yawRelevance * distY;
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestFace = index;
+  // Detect which face is most aligned with the camera by transforming each
+  // face normal into world space and comparing with the camera direction.
+  // This works from ANY approach angle — no single-quaternion ambiguity.
+  const findClosestFace = useCallback((quat: THREE.Quaternion): number => {
+    let best = 0;
+    let bestDot = -Infinity;
+    for (let i = 0; i < FACE_NORMALS.length; i++) {
+      _vFace.copy(FACE_NORMALS[i]).applyQuaternion(quat);
+      const d = _vFace.dot(CAMERA_DIR);
+      if (d > bestDot) {
+        bestDot = d;
+        best = i;
       }
-    });
-
-    return closestFace;
+    }
+    return best;
   }, []);
 
   // When targetFace changes from slider, animate to that face
   useEffect(() => {
-    if (targetFace >= 0 && targetFace < FACE_TARGETS.length) {
-      const [targetX, targetY] = FACE_TARGETS[targetFace];
-      targetRotationX.current = clampPitch(targetX);
-      targetRotationY.current = nearestEquivalentAngle(targetRotationY.current, targetY);
+    if (targetFace >= 0 && targetFace < FACE_TARGET_QUATS.length) {
+      targetQuat.current.copy(FACE_TARGET_QUATS[targetFace]);
       velocityX.current = 0;
       velocityY.current = 0;
       onFaceChange?.(targetFace);
@@ -140,12 +149,12 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       canvas.style.cursor = isHovered ? 'grab' : 'default';
       event.preventDefault();
 
-      const projectedX = targetRotationX.current + velocityX.current * SNAP_LOOKAHEAD_SECONDS;
-      const projectedY = targetRotationY.current + velocityY.current * SNAP_LOOKAHEAD_SECONDS;
-      const closestFace = findClosestFace(projectedX, projectedY);
-      const [snapX, snapY] = FACE_TARGETS[closestFace];
-      targetRotationX.current = snapX;
-      targetRotationY.current = nearestEquivalentAngle(targetRotationY.current, snapY);
+      // Project current orientation forward by velocity to pick the snap target
+      _qDeltaY.setFromAxisAngle(WORLD_Y, velocityY.current * SNAP_LOOKAHEAD_SECONDS);
+      _qDeltaX.setFromAxisAngle(WORLD_X, velocityX.current * SNAP_LOOKAHEAD_SECONDS);
+      _qScratch.copy(targetQuat.current).premultiply(_qDeltaX).premultiply(_qDeltaY);
+      const closestFace = findClosestFace(_qScratch);
+      targetQuat.current.copy(FACE_TARGET_QUATS[closestFace]);
       velocityX.current = 0;
       velocityY.current = 0;
       onFaceChange?.(closestFace);
@@ -171,15 +180,17 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       const now = event.timeStamp || performance.now();
       const dt = Math.max((now - lastPointerTime.current) / 1000, 1 / 240);
 
-      // Why this works: pointer handlers only update target state + velocity.
-      // Visual rotation is still committed once per frame in useFrame.
-      targetRotationY.current += dx * SENSITIVITY;
-      // Keep vertical drag direction consistent on every face:
-      // dragging down (positive dy) should tilt cube downward (positive rotationX).
-      targetRotationX.current = clampPitch(targetRotationX.current + dy * SENSITIVITY);
+      // World-space quaternion drag: dx rotates around world Y, dy around world X.
+      // This gives identical drag feel on every face (no gimbal lock).
+      const dRotY = dx * SENSITIVITY;
+      const dRotX = dy * SENSITIVITY;
+      _qDeltaY.setFromAxisAngle(WORLD_Y, dRotY);
+      _qDeltaX.setFromAxisAngle(WORLD_X, dRotX);
+      // Pre-multiply = world-space rotation
+      targetQuat.current.premultiply(_qDeltaX).premultiply(_qDeltaY).normalize();
 
-      const nextVelY = (dx * SENSITIVITY) / dt;
-      const nextVelX = (dy * SENSITIVITY) / dt;
+      const nextVelY = dRotY / dt;
+      const nextVelX = dRotX / dt;
       velocityX.current = THREE.MathUtils.lerp(velocityX.current, nextVelX, VELOCITY_SMOOTHING);
       velocityY.current = THREE.MathUtils.lerp(velocityY.current, nextVelY, VELOCITY_SMOOTHING);
 
@@ -232,32 +243,31 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       groupRef.current.scale.set(s, s, s);
     }
 
-    // Smooth tracking to target without mutating transforms in pointer events.
+    // Smooth tracking to target via quaternion slerp.
     const lerpSpeed = isDragging.current ? DRAG_LERP_SPEED : IDLE_LERP_SPEED;
-    currentRotationX.current = clampPitch(
-      currentRotationX.current + (targetRotationX.current - currentRotationX.current) * lerpSpeed
-    );
-    currentRotationY.current += (targetRotationY.current - currentRotationY.current) * lerpSpeed;
+    // Ensure shortest-path slerp (avoid the "long way around")
+    if (currentQuat.current.dot(targetQuat.current) < 0) {
+      targetQuat.current.set(
+        -targetQuat.current.x,
+        -targetQuat.current.y,
+        -targetQuat.current.z,
+        -targetQuat.current.w,
+      );
+    }
+    currentQuat.current.slerp(targetQuat.current, lerpSpeed);
 
-    // Apply rotation = base snap + base tilt + entrance spin + breathing oscillation
+    // Apply rotation: main quaternion + small breathing/entrance offsets
     if (rotationGroupRef.current) {
-      // YXZ order: Y (yaw) is applied first as world-space horizontal rotation,
-      // then X (pitch) tilts on top. This avoids gimbal lock at the poles
-      // (top/bottom faces) where XYZ would conflate yaw with roll.
-      rotationGroupRef.current.rotation.order = 'YXZ';
-      rotationGroupRef.current.rotation.x =
-        currentRotationX.current +
-        breathing.baseTiltX +
-        entrance.rotationXOffset.current +
-        breathing.rotX.current;
-
-      rotationGroupRef.current.rotation.y =
-        currentRotationY.current +
-        breathing.baseTiltY +
-        entrance.rotationYOffset.current +
-        breathing.rotY.current;
-
-      rotationGroupRef.current.rotation.z = breathing.rotZ.current;
+      // Breathing + entrance as a small world-space offset quaternion
+      _eScratch.set(
+        breathing.baseTiltX + entrance.rotationXOffset.current + breathing.rotX.current,
+        breathing.baseTiltY + entrance.rotationYOffset.current + breathing.rotY.current,
+        breathing.rotZ.current,
+        'YXZ',
+      );
+      _qOffset.setFromEuler(_eScratch);
+      // offset * main  →  offset is applied in world space (consistent wobble)
+      rotationGroupRef.current.quaternion.copy(currentQuat.current).premultiply(_qOffset);
     }
   });
 
