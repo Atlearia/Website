@@ -26,7 +26,7 @@ const FACE_TARGETS: Array<[number, number]> = [
 const SENSITIVITY = 0.0035; // radians per pixel
 const DRAG_LERP_SPEED = 0.26;
 const IDLE_LERP_SPEED = 0.12;
-const MAX_PITCH = THREE.MathUtils.degToRad(85);
+const MAX_PITCH = THREE.MathUtils.degToRad(90);
 const VELOCITY_SMOOTHING = 0.35;
 const SNAP_LOOKAHEAD_SECONDS = 0.18;
 const TWO_PI = Math.PI * 2;
@@ -73,16 +73,20 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   const findClosestFace = useCallback((rotationX: number, rotationY: number): number => {
     let closestFace = 0;
     let closestDistance = Infinity;
-    const normalizedCurrentY = ((rotationY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const normalizedCurrentY = ((rotationY % TWO_PI) + TWO_PI) % TWO_PI;
 
     FACE_TARGETS.forEach(([targetX, targetY], index) => {
-      const normalizedTargetY = ((targetY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const normalizedTargetY = ((targetY % TWO_PI) + TWO_PI) % TWO_PI;
       const distX = Math.abs(rotationX - targetX);
       const distY = Math.min(
         Math.abs(normalizedCurrentY - normalizedTargetY),
-        Math.PI * 2 - Math.abs(normalizedCurrentY - normalizedTargetY)
+        TWO_PI - Math.abs(normalizedCurrentY - normalizedTargetY)
       );
-      const distance = distX + distY;
+      // At the poles (top/bottom, targetX = ±π/2) every Y value shows the
+      // same face, so Y distance is irrelevant. Scale it by |cos(targetX)|:
+      // 1 for side faces (equator), ~0 for top/bottom (poles).
+      const yawRelevance = Math.abs(Math.cos(targetX));
+      const distance = distX + yawRelevance * distY;
       if (distance < closestDistance) {
         closestDistance = distance;
         closestFace = index;
@@ -171,11 +175,11 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       // Visual rotation is still committed once per frame in useFrame.
       targetRotationY.current += dx * SENSITIVITY;
       // Keep vertical drag direction consistent on every face:
-      // dragging down increases dy, so we subtract dy to tilt cube downward.
-      targetRotationX.current = clampPitch(targetRotationX.current - dy * SENSITIVITY);
+      // dragging down (positive dy) should tilt cube downward (positive rotationX).
+      targetRotationX.current = clampPitch(targetRotationX.current + dy * SENSITIVITY);
 
       const nextVelY = (dx * SENSITIVITY) / dt;
-      const nextVelX = (-dy * SENSITIVITY) / dt;
+      const nextVelX = (dy * SENSITIVITY) / dt;
       velocityX.current = THREE.MathUtils.lerp(velocityX.current, nextVelX, VELOCITY_SMOOTHING);
       velocityY.current = THREE.MathUtils.lerp(velocityY.current, nextVelY, VELOCITY_SMOOTHING);
 
@@ -237,6 +241,10 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
 
     // Apply rotation = base snap + base tilt + entrance spin + breathing oscillation
     if (rotationGroupRef.current) {
+      // YXZ order: Y (yaw) is applied first as world-space horizontal rotation,
+      // then X (pitch) tilts on top. This avoids gimbal lock at the poles
+      // (top/bottom faces) where XYZ would conflate yaw with roll.
+      rotationGroupRef.current.rotation.order = 'YXZ';
       rotationGroupRef.current.rotation.x =
         currentRotationX.current +
         breathing.baseTiltX +
