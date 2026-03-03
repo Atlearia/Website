@@ -22,6 +22,21 @@ const FACE_TARGETS: Array<[number, number]> = [
   [Math.PI / 2, 0],                // Bottom - Contact
 ];
 
+// Drag feel tuning
+const SENSITIVITY = 0.0035; // radians per pixel
+const DRAG_LERP_SPEED = 0.26;
+const IDLE_LERP_SPEED = 0.12;
+const MAX_PITCH = THREE.MathUtils.degToRad(85);
+const VELOCITY_SMOOTHING = 0.35;
+const SNAP_LOOKAHEAD_SECONDS = 0.18;
+const TWO_PI = Math.PI * 2;
+
+const clampPitch = (pitch: number) => THREE.MathUtils.clamp(pitch, -MAX_PITCH, MAX_PITCH);
+const nearestEquivalentAngle = (current: number, target: number) => {
+  const delta = ((target - current + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
+  return current + delta;
+};
+
 interface InteractiveCubeProps {
   onFaceChange?: (faceIndex: number) => void;
   targetFace?: number; // Controlled from slider
@@ -40,8 +55,12 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   
   // Drag state
   const isDragging = useRef(false);
-  const lastMouseX = useRef(0);
-  const lastMouseY = useRef(0);
+  const activePointerId = useRef<number | null>(null);
+  const lastPointerX = useRef(0);
+  const lastPointerY = useRef(0);
+  const lastPointerTime = useRef(0);
+  const velocityX = useRef(0);
+  const velocityY = useRef(0);
   
   const [isHovered, setIsHovered] = useState(false);
 
@@ -51,39 +70,18 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   const breathing = useCubeBreathing();
   const groupRef = useRef<THREE.Group>(null);
 
-  // When targetFace changes from slider, animate to that face
-  useEffect(() => {
-    if (targetFace >= 0 && targetFace < FACE_TARGETS.length) {
-      const [targetX, targetY] = FACE_TARGETS[targetFace];
-      targetRotationX.current = targetX;
-      targetRotationY.current = targetY;
-      onFaceChange?.(targetFace);
-    }
-  }, [targetFace, onFaceChange]);
-
-  // Drag constants
-  const DRAG_SPEED = 0.006;
-  const LERP_SPEED = 0.08;
-
-  // Snap to nearest face
-  const snapToNearestFace = useCallback(() => {
-    const currentX = targetRotationX.current;
-    const currentY = targetRotationY.current;
-    
+  const findClosestFace = useCallback((rotationX: number, rotationY: number): number => {
     let closestFace = 0;
     let closestDistance = Infinity;
+    const normalizedCurrentY = ((rotationY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
 
     FACE_TARGETS.forEach(([targetX, targetY], index) => {
-      // Normalize angles for comparison
-      const normalizedCurrentY = ((currentY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
       const normalizedTargetY = ((targetY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      
-      const distX = Math.abs(currentX - targetX);
+      const distX = Math.abs(rotationX - targetX);
       const distY = Math.min(
         Math.abs(normalizedCurrentY - normalizedTargetY),
         Math.PI * 2 - Math.abs(normalizedCurrentY - normalizedTargetY)
       );
-      
       const distance = distX + distY;
       if (distance < closestDistance) {
         closestDistance = distance;
@@ -91,89 +89,124 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       }
     });
 
-    const [snapX, snapY] = FACE_TARGETS[closestFace];
-    targetRotationX.current = snapX;
-    targetRotationY.current = snapY;
-    onFaceChange?.(closestFace);
-  }, [onFaceChange]);
+    return closestFace;
+  }, []);
 
-  // Event handlers for manual drag
+  // When targetFace changes from slider, animate to that face
+  useEffect(() => {
+    if (targetFace >= 0 && targetFace < FACE_TARGETS.length) {
+      const [targetX, targetY] = FACE_TARGETS[targetFace];
+      targetRotationX.current = clampPitch(targetX);
+      targetRotationY.current = nearestEquivalentAngle(targetRotationY.current, targetY);
+      velocityX.current = 0;
+      velocityY.current = 0;
+      onFaceChange?.(targetFace);
+    }
+  }, [targetFace, onFaceChange]);
+
+  // Unified pointer handling for mouse + touch + pen
   useEffect(() => {
     const canvas = gl.domElement;
 
-    const handleMouseDown = (e: MouseEvent) => {
+    const startDrag = (event: PointerEvent) => {
+      if (activePointerId.current !== null) return;
+      if (!event.isPrimary) return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+
+      activePointerId.current = event.pointerId;
       isDragging.current = true;
-      lastMouseX.current = e.clientX;
-      lastMouseY.current = e.clientY;
+      lastPointerX.current = event.clientX;
+      lastPointerY.current = event.clientY;
+      lastPointerTime.current = event.timeStamp || performance.now();
+      velocityX.current = 0;
+      velocityY.current = 0;
       canvas.style.cursor = 'grabbing';
-    };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current) return;
-
-      const deltaX = e.clientX - lastMouseX.current;
-      const deltaY = e.clientY - lastMouseY.current;
-
-      targetRotationY.current += deltaX * DRAG_SPEED;
-      targetRotationX.current += deltaY * DRAG_SPEED;
-
-      lastMouseX.current = e.clientX;
-      lastMouseY.current = e.clientY;
-    };
-
-    const handleMouseUp = () => {
-      isDragging.current = false;
-      canvas.style.cursor = isHovered ? 'grab' : 'default';
-      
-      // Snap to nearest face after drag
-      snapToNearestFace();
-    };
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
-        isDragging.current = true;
-        lastMouseX.current = e.touches[0].clientX;
-        lastMouseY.current = e.touches[0].clientY;
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch {
+        // Some browsers can throw if capture is unavailable; drag still works.
       }
     };
 
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!isDragging.current || e.touches.length !== 1) return;
-      e.preventDefault();
-
-      const deltaX = e.touches[0].clientX - lastMouseX.current;
-      const deltaY = e.touches[0].clientY - lastMouseY.current;
-
-      targetRotationY.current += deltaX * DRAG_SPEED;
-      targetRotationX.current += deltaY * DRAG_SPEED;
-
-      lastMouseX.current = e.touches[0].clientX;
-      lastMouseY.current = e.touches[0].clientY;
-    };
-
-    const handleTouchEnd = () => {
+    const endDrag = (event: PointerEvent) => {
+      if (activePointerId.current !== event.pointerId) return;
       isDragging.current = false;
-      snapToNearestFace();
+      canvas.style.cursor = isHovered ? 'grab' : 'default';
+      event.preventDefault();
+
+      const projectedX = targetRotationX.current + velocityX.current * SNAP_LOOKAHEAD_SECONDS;
+      const projectedY = targetRotationY.current + velocityY.current * SNAP_LOOKAHEAD_SECONDS;
+      const closestFace = findClosestFace(projectedX, projectedY);
+      const [snapX, snapY] = FACE_TARGETS[closestFace];
+      targetRotationX.current = snapX;
+      targetRotationY.current = nearestEquivalentAngle(targetRotationY.current, snapY);
+      velocityX.current = 0;
+      velocityY.current = 0;
+      onFaceChange?.(closestFace);
+
+      try {
+        if (canvas.hasPointerCapture(event.pointerId)) {
+          canvas.releasePointerCapture(event.pointerId);
+        }
+      } catch {
+        // Ignore release errors when capture has already been lost.
+      }
+
+      activePointerId.current = null;
+      lastPointerTime.current = 0;
     };
 
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', handleMouseUp);
-    canvas.addEventListener('mouseleave', handleMouseUp);
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
-    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-    canvas.addEventListener('touchend', handleTouchEnd);
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!isDragging.current || activePointerId.current !== event.pointerId) return;
+      event.preventDefault();
+
+      const dx = event.clientX - lastPointerX.current;
+      const dy = event.clientY - lastPointerY.current;
+      const now = event.timeStamp || performance.now();
+      const dt = Math.max((now - lastPointerTime.current) / 1000, 1 / 240);
+
+      // Why this works: pointer handlers only update target state + velocity.
+      // Visual rotation is still committed once per frame in useFrame.
+      targetRotationY.current += dx * SENSITIVITY;
+      // Keep vertical drag direction consistent on every face:
+      // dragging down increases dy, so we subtract dy to tilt cube downward.
+      targetRotationX.current = clampPitch(targetRotationX.current - dy * SENSITIVITY);
+
+      const nextVelY = (dx * SENSITIVITY) / dt;
+      const nextVelX = (-dy * SENSITIVITY) / dt;
+      velocityX.current = THREE.MathUtils.lerp(velocityX.current, nextVelX, VELOCITY_SMOOTHING);
+      velocityY.current = THREE.MathUtils.lerp(velocityY.current, nextVelY, VELOCITY_SMOOTHING);
+
+      lastPointerX.current = event.clientX;
+      lastPointerY.current = event.clientY;
+      lastPointerTime.current = now;
+    };
+
+    const handleLostCapture = (event: PointerEvent) => {
+      if (activePointerId.current !== event.pointerId) return;
+      isDragging.current = false;
+      velocityX.current = 0;
+      velocityY.current = 0;
+      activePointerId.current = null;
+      canvas.style.cursor = isHovered ? 'grab' : 'default';
+    };
+
+    canvas.addEventListener('pointerdown', startDrag, { passive: false });
+    canvas.addEventListener('pointermove', handlePointerMove, { passive: false });
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('lostpointercapture', handleLostCapture);
 
     return () => {
-      canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mouseup', handleMouseUp);
-      canvas.removeEventListener('mouseleave', handleMouseUp);
-      canvas.removeEventListener('touchstart', handleTouchStart);
-      canvas.removeEventListener('touchmove', handleTouchMove);
-      canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('pointerdown', startDrag);
+      canvas.removeEventListener('pointermove', handlePointerMove);
+      canvas.removeEventListener('pointerup', endDrag);
+      canvas.removeEventListener('pointercancel', endDrag);
+      canvas.removeEventListener('lostpointercapture', handleLostCapture);
     };
-  }, [gl, isHovered, snapToNearestFace]);
+  }, [findClosestFace, gl, isHovered, onFaceChange]);
 
   // Animation loop
   useFrame((_, delta) => {
@@ -182,7 +215,7 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
     // --- Entrance animation ---
     entrance.update(delta);
 
-    // --- Breathing (active only when not dragging & entrance done) ---
+    // --- Breathing (disabled while dragging to avoid jitter blend) ---
     const breathingActive = !isDragging.current && entrance.isComplete.current;
     breathing.update(delta, breathingActive);
 
@@ -195,9 +228,12 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       groupRef.current.scale.set(s, s, s);
     }
 
-    // --- Smooth interpolation to target rotation ---
-    currentRotationX.current += (targetRotationX.current - currentRotationX.current) * LERP_SPEED;
-    currentRotationY.current += (targetRotationY.current - currentRotationY.current) * LERP_SPEED;
+    // Smooth tracking to target without mutating transforms in pointer events.
+    const lerpSpeed = isDragging.current ? DRAG_LERP_SPEED : IDLE_LERP_SPEED;
+    currentRotationX.current = clampPitch(
+      currentRotationX.current + (targetRotationX.current - currentRotationX.current) * lerpSpeed
+    );
+    currentRotationY.current += (targetRotationY.current - currentRotationY.current) * lerpSpeed;
 
     // Apply rotation = base snap + base tilt + entrance spin + breathing oscillation
     if (rotationGroupRef.current) {

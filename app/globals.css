@@ -143,6 +143,17 @@ a {
   -webkit-backface-visibility: hidden;
 }
 
+.cube-face-html,
+.cube-face-html *,
+.cube-face-content,
+.cube-face-content * {
+  pointer-events: none !important;
+}
+
+.cube-canvas-3d {
+  touch-action: none;
+}
+
 /* ============================================
    CARD UTILITIES
    ============================================ */
