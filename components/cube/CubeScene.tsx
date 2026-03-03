@@ -135,10 +135,11 @@ export function CubeScene({ className = '' }: CubeSceneProps) {
   }, []);
 
   return (
-    <div className={`relative w-full h-full flex flex-col ${className}`}>
+    <div className={`cube-scene-wrapper relative w-full h-full flex flex-col ${className}`}>
       {/* 3D Canvas - takes most of the space */}
       <div className="flex-1 relative">
         <Canvas
+          className="cube-canvas-3d"
           shadows
           dpr={[1, 2]}
           gl={{ 
@@ -149,6 +150,8 @@ export function CubeScene({ className = '' }: CubeSceneProps) {
           style={{ 
             background: 'transparent',
             cursor: 'grab',
+            transformStyle: 'preserve-3d',
+            willChange: 'transform',
           }}
         >
           <Suspense fallback={null}>

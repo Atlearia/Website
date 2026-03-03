@@ -125,6 +125,25 @@ a {
 }
 
 /* ============================================
+   CUBE 3D STABILITY
+   ============================================ */
+.cube-scene-wrapper,
+.cube-canvas-3d,
+.cube-face-html,
+.cube-face-html > div,
+.cube-face-content {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.cube-face-html,
+.cube-face-html > div,
+.cube-face-content {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* ============================================
    CARD UTILITIES
    ============================================ */
 .glass-card {

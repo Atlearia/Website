@@ -13,6 +13,15 @@ import { CubeFace } from './CubeFace';
 import { useCubeEntrance } from '@/hooks/useCubeEntrance';
 import { useCubeBreathing } from '@/hooks/useCubeBreathing';
 
+const FACE_TARGETS: Array<[number, number]> = [
+  [0, 0],                          // Front - Intro
+  [0, Math.PI],                    // Back - Education
+  [0, Math.PI / 2],                // Right - Skills
+  [0, -Math.PI / 2],               // Left - Projects
+  [-Math.PI / 2, 0],               // Top - Experience
+  [Math.PI / 2, 0],                // Bottom - Contact
+];
+
 interface InteractiveCubeProps {
   onFaceChange?: (faceIndex: number) => void;
   targetFace?: number; // Controlled from slider
@@ -20,6 +29,7 @@ interface InteractiveCubeProps {
 
 export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCubeProps) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const rotationGroupRef = useRef<THREE.Group>(null);
   const { gl } = useThree();
   
   // Rotation state
@@ -34,7 +44,6 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   const lastMouseY = useRef(0);
   
   const [isHovered, setIsHovered] = useState(false);
-  const [activeFace, setActiveFace] = useState(0);
 
   // Entrance "fly-in with spin" animation
   const entrance = useCubeEntrance();
@@ -42,23 +51,12 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   const breathing = useCubeBreathing();
   const groupRef = useRef<THREE.Group>(null);
 
-  // Face target rotations (which rotation shows which face)
-  const faceTargets: Array<[number, number]> = [
-    [0, 0],                          // Front - Intro
-    [0, Math.PI],                    // Back - Education
-    [0, Math.PI / 2],                // Right - Skills
-    [0, -Math.PI / 2],               // Left - Projects
-    [-Math.PI / 2, 0],               // Top - Experience
-    [Math.PI / 2, 0],                // Bottom - Contact
-  ];
-
   // When targetFace changes from slider, animate to that face
   useEffect(() => {
-    if (targetFace >= 0 && targetFace < faceTargets.length) {
-      const [targetX, targetY] = faceTargets[targetFace];
+    if (targetFace >= 0 && targetFace < FACE_TARGETS.length) {
+      const [targetX, targetY] = FACE_TARGETS[targetFace];
       targetRotationX.current = targetX;
       targetRotationY.current = targetY;
-      setActiveFace(targetFace);
       onFaceChange?.(targetFace);
     }
   }, [targetFace, onFaceChange]);
@@ -66,6 +64,38 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   // Drag constants
   const DRAG_SPEED = 0.006;
   const LERP_SPEED = 0.08;
+
+  // Snap to nearest face
+  const snapToNearestFace = useCallback(() => {
+    const currentX = targetRotationX.current;
+    const currentY = targetRotationY.current;
+    
+    let closestFace = 0;
+    let closestDistance = Infinity;
+
+    FACE_TARGETS.forEach(([targetX, targetY], index) => {
+      // Normalize angles for comparison
+      const normalizedCurrentY = ((currentY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const normalizedTargetY = ((targetY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      
+      const distX = Math.abs(currentX - targetX);
+      const distY = Math.min(
+        Math.abs(normalizedCurrentY - normalizedTargetY),
+        Math.PI * 2 - Math.abs(normalizedCurrentY - normalizedTargetY)
+      );
+      
+      const distance = distX + distY;
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestFace = index;
+      }
+    });
+
+    const [snapX, snapY] = FACE_TARGETS[closestFace];
+    targetRotationX.current = snapX;
+    targetRotationY.current = snapY;
+    onFaceChange?.(closestFace);
+  }, [onFaceChange]);
 
   // Event handlers for manual drag
   useEffect(() => {
@@ -143,44 +173,11 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [gl, isHovered]);
-
-  // Snap to nearest face
-  const snapToNearestFace = useCallback(() => {
-    const currentX = targetRotationX.current;
-    const currentY = targetRotationY.current;
-    
-    let closestFace = 0;
-    let closestDistance = Infinity;
-
-    faceTargets.forEach(([targetX, targetY], index) => {
-      // Normalize angles for comparison
-      const normalizedCurrentY = ((currentY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      const normalizedTargetY = ((targetY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      
-      const distX = Math.abs(currentX - targetX);
-      const distY = Math.min(
-        Math.abs(normalizedCurrentY - normalizedTargetY),
-        Math.PI * 2 - Math.abs(normalizedCurrentY - normalizedTargetY)
-      );
-      
-      const distance = distX + distY;
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestFace = index;
-      }
-    });
-
-    const [snapX, snapY] = faceTargets[closestFace];
-    targetRotationX.current = snapX;
-    targetRotationY.current = snapY;
-    setActiveFace(closestFace);
-    onFaceChange?.(closestFace);
-  }, [onFaceChange]);
+  }, [gl, isHovered, snapToNearestFace]);
 
   // Animation loop
   useFrame((_, delta) => {
-    if (!meshRef.current) return;
+    if (!rotationGroupRef.current) return;
 
     // --- Entrance animation ---
     entrance.update(delta);
@@ -203,88 +200,129 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
     currentRotationY.current += (targetRotationY.current - currentRotationY.current) * LERP_SPEED;
 
     // Apply rotation = base snap + base tilt + entrance spin + breathing oscillation
-    meshRef.current.rotation.x =
-      currentRotationX.current +
-      breathing.baseTiltX +
-      entrance.rotationXOffset.current +
-      breathing.rotX.current;
+    if (rotationGroupRef.current) {
+      rotationGroupRef.current.rotation.x =
+        currentRotationX.current +
+        breathing.baseTiltX +
+        entrance.rotationXOffset.current +
+        breathing.rotX.current;
 
-    meshRef.current.rotation.y =
-      currentRotationY.current +
-      breathing.baseTiltY +
-      entrance.rotationYOffset.current +
-      breathing.rotY.current;
+      rotationGroupRef.current.rotation.y =
+        currentRotationY.current +
+        breathing.baseTiltY +
+        entrance.rotationYOffset.current +
+        breathing.rotY.current;
 
-    meshRef.current.rotation.z = breathing.rotZ.current;
+      rotationGroupRef.current.rotation.z = breathing.rotZ.current;
+    }
   });
 
   // Face configurations
   const size = cubeVisuals.size;
-  const offset = size / 2 + 0.01;
-  
-  const faceConfigs: Array<{ position: [number, number, number]; rotation: [number, number, number] }> = [
-    { position: [0, 0, offset], rotation: [0, 0, 0] },
-    { position: [0, 0, -offset], rotation: [0, Math.PI, 0] },
-    { position: [offset, 0, 0], rotation: [0, Math.PI / 2, 0] },
-    { position: [-offset, 0, 0], rotation: [0, -Math.PI / 2, 0] },
-    { position: [0, offset, 0], rotation: [-Math.PI / 2, 0, 0] },
-    { position: [0, -offset, 0], rotation: [Math.PI / 2, 0, 0] },
+  const facePlaneDepth = size / 2 + 0.001;
+  const htmlFaceDepthBase = facePlaneDepth + 0.03;
+
+  const faceConfigs: Array<{ normal: [number, number, number]; rotation: [number, number, number] }> = [
+    { normal: [0, 0, 1], rotation: [0, 0, 0] },
+    { normal: [0, 0, -1], rotation: [0, Math.PI, 0] },
+    { normal: [1, 0, 0], rotation: [0, Math.PI / 2, 0] },
+    { normal: [-1, 0, 0], rotation: [0, -Math.PI / 2, 0] },
+    { normal: [0, 1, 0], rotation: [-Math.PI / 2, 0, 0] },
+    { normal: [0, -1, 0], rotation: [Math.PI / 2, 0, 0] },
   ];
+  // Why this works: HTML panels are moved slightly in front of their face planes
+  // with a tiny per-face epsilon, which prevents depth conflicts and flicker.
+  const facePlanePositions = faceConfigs.map(({ normal }) => [
+    normal[0] * facePlaneDepth,
+    normal[1] * facePlaneDepth,
+    normal[2] * facePlaneDepth,
+  ] as [number, number, number]);
+  const htmlFacePositions = faceConfigs.map(({ normal }, index) => {
+    const depth = htmlFaceDepthBase + index * 0.0005;
+    return [
+      normal[0] * depth,
+      normal[1] * depth,
+      normal[2] * depth,
+    ] as [number, number, number];
+  });
+  const facePlaneSize = cubeVisuals.faceSize;
 
   return (
     <group ref={groupRef}>
-      <mesh
-        ref={meshRef}
-        onPointerEnter={() => {
-          setIsHovered(true);
-          if (!isDragging.current) gl.domElement.style.cursor = 'grab';
-        }}
-        onPointerLeave={() => {
-          setIsHovered(false);
-          if (!isDragging.current) gl.domElement.style.cursor = 'default';
-        }}
-      >
-        <boxGeometry args={[size, size, size]} />
-        <meshStandardMaterial
-          color="#0f172a"
-          metalness={0.2}
-          roughness={0.8}
-          transparent
-          opacity={0.95}
-        />
+      <group ref={rotationGroupRef}>
+        <mesh
+          ref={meshRef}
+          onPointerEnter={() => {
+            setIsHovered(true);
+            if (!isDragging.current) gl.domElement.style.cursor = 'grab';
+          }}
+          onPointerLeave={() => {
+            setIsHovered(false);
+            if (!isDragging.current) gl.domElement.style.cursor = 'default';
+          }}
+        >
+          <boxGeometry args={[size, size, size]} />
+          <meshStandardMaterial
+            color="#0b1120"
+            metalness={0.05}
+            roughness={0.95}
+            transparent={false}
+          />
 
+          {faceConfigs.map((face, index) => (
+            <mesh
+              key={`face-plane-${index}`}
+              position={facePlanePositions[index]}
+              rotation={face.rotation}
+            >
+              <planeGeometry args={[facePlaneSize, facePlaneSize]} />
+              <meshStandardMaterial
+                color="#0b1120"
+                metalness={0.05}
+                roughness={0.95}
+              />
+            </mesh>
+          ))}
+
+          {cubeContent.map((face, index) => (
+            <Html
+              key={face.id}
+              transform
+              wrapperClass="cube-face-html"
+              position={htmlFacePositions[index]}
+              rotation={faceConfigs[index].rotation}
+              distanceFactor={3.2}
+              zIndexRange={[100, 0]}
+              style={{
+                width: '280px',
+                height: '280px',
+                pointerEvents: 'none',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+                willChange: 'transform',
+                transformStyle: 'preserve-3d',
+              }}
+            >
+              <CubeFace content={face} />
+            </Html>
+          ))}
+        </mesh>
+
+        {/* Edges inside rotation group for proper tracking */}
         <lineSegments>
           <edgesGeometry args={[new THREE.BoxGeometry(size, size, size)]} />
           <lineBasicMaterial color="#14b8a6" transparent opacity={0.6} />
         </lineSegments>
 
-        {cubeContent.map((face, index) => (
-          <Html
-            key={face.id}
-            transform
-            position={faceConfigs[index].position}
-            rotation={faceConfigs[index].rotation}
-            distanceFactor={3.2}
-            zIndexRange={[100, 0]}
-            style={{
-              width: '280px',
-              height: '280px',
-              pointerEvents: 'none',
-            }}
-          >
-            <CubeFace content={face} isActive={activeFace === index} />
-          </Html>
-        ))}
-      </mesh>
-
-      <mesh scale={1.02}>
-        <boxGeometry args={[size, size, size]} />
-        <meshBasicMaterial
-          color="#14b8a6"
-          transparent
-          opacity={isHovered ? 0.06 : 0.02}
-        />
-      </mesh>
+        <mesh scale={1.02}>
+          <boxGeometry args={[size, size, size]} />
+          <meshBasicMaterial
+            color="#14b8a6"
+            transparent
+            opacity={isHovered ? 0.04 : 0}
+          />
+        </mesh>
+      </group>
     </group>
   );
 }

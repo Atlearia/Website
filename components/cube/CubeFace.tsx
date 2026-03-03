@@ -27,122 +27,189 @@ const Icons = {
 
 interface CubeFaceProps {
   content: CubeFaceContent;
-  isActive: boolean;
 }
 
-export function CubeFace({ content, isActive }: CubeFaceProps) {
+export function CubeFace({ content }: CubeFaceProps) {
   const [gradientFrom, gradientTo] = content.gradient;
 
   return (
     <div
-      className="w-full h-full select-none overflow-hidden rounded-xl"
+      className="cube-face-content w-full h-full select-none overflow-hidden relative"
       style={{
         userSelect: 'none',
         WebkitUserSelect: 'none',
-        background: '#0c1322',
-        border: `2px solid ${gradientFrom}`,
-        boxShadow: isActive 
-          ? `0 0 20px ${gradientFrom}80, inset 0 0 30px ${gradientFrom}30`
-          : `0 0 10px ${gradientFrom}40`,
-        transform: isActive ? 'scale(1)' : 'scale(0.98)',
-        transition: 'all 0.3s ease',
+        background: '#0b1120',
+        // Why this works: keep each face in its own stable 3D layer to avoid
+        // flattening/backface artifacts while the parent cube rotates.
+        transform: 'translateZ(0.1px)',
+        transformStyle: 'preserve-3d',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+        willChange: 'transform',
+        contain: 'layout style paint',
       }}
     >
-      {/* Gradient top bar */}
+      {/* Aesthetic background layer */}
       <div
-        className="h-2 w-full"
+        className="absolute inset-0"
         style={{
-          background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})`,
+          backgroundImage: `
+            radial-gradient(120px 120px at 18% 20%, ${gradientFrom}22, transparent 60%),
+            radial-gradient(140px 140px at 85% 75%, ${gradientTo}22, transparent 60%),
+            linear-gradient(135deg, ${gradientFrom}12 0%, transparent 45%),
+            repeating-linear-gradient(45deg, #0f172a 0 6px, #0b1120 6px 12px)
+          `,
+          opacity: 0.9,
         }}
       />
 
-      {/* Content */}
-      <div className="h-full p-4 flex flex-col" style={{ height: 'calc(100% - 8px)' }}>
-        {/* Header */}
-        <div className="mb-3">
-          <h2
-            className="text-xl font-bold tracking-tight mb-0.5"
-            style={{ color: gradientFrom }}
-          >
-            {content.title}
-          </h2>
-          {content.subtitle && (
-            <p className="text-xs text-gray-400 font-medium">{content.subtitle}</p>
-          )}
-        </div>
+      {/* Side accents */}
+      <div
+        className="absolute left-0 top-0 bottom-0"
+        style={{
+          width: '4px',
+          background: `linear-gradient(180deg, ${gradientFrom}, ${gradientTo})`,
+          opacity: 1,
+        }}
+      />
+      <div
+        className="absolute right-0 top-10"
+        style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '999px',
+          background: `radial-gradient(circle, ${gradientFrom}55 0%, transparent 65%)`,
+          opacity: 0.8,
+        }}
+      />
+      <div
+        className="absolute left-8 bottom-6"
+        style={{
+          width: '70px',
+          height: '2px',
+          background: `linear-gradient(90deg, ${gradientTo}, transparent)`,
+          opacity: 0.8,
+        }}
+      />
 
-        {/* Description */}
-        {content.description && (
-          <p className="text-[10px] text-gray-400 leading-relaxed mb-3">
-            {content.description}
-          </p>
-        )}
+      {/* Center info panel */}
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div
+          className="relative w-full h-full"
+          style={{
+            width: '78%',
+            height: '78%',
+            background: '#0f172a',
+            border: `1px solid ${gradientFrom}40`,
+            boxShadow: `0 0 18px ${gradientFrom}22, inset 0 0 18px #0b1120`,
+          }}
+        >
+          {/* Top accent line */}
+          <div
+            className="w-full"
+            style={{
+              height: '2px',
+              background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo}50, transparent)`,
+            }}
+          />
 
-        {/* Items list */}
-        {content.items && (
-          <div className="flex-1 space-y-1.5 overflow-hidden">
-            {content.items.map((item, index) => (
-              <div 
-                key={index}
-                className="flex items-center justify-between py-1.5 px-2 rounded-md"
-                style={{ 
-                  background: `${gradientFrom}20`,
-                  border: `1px solid ${gradientFrom}40`,
-                }}
+          {/* Content */}
+          <div className="relative h-full px-4 pt-3 pb-3 flex flex-col" style={{ height: 'calc(100% - 2px)' }}>
+            {/* Header */}
+            <div className="mb-2">
+              <h2
+                className="text-lg font-bold tracking-tight leading-tight"
+                style={{ color: gradientFrom }}
               >
-                <span className="text-[10px] text-gray-300 font-medium">{item.label}</span>
-                <span 
-                  className="text-[10px] font-bold text-right"
-                  style={{ color: '#fff' }}
-                >
-                  {item.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+                {content.title}
+              </h2>
+              {content.subtitle && (
+                <p className="text-[11px] text-gray-400 font-medium mt-0.5">{content.subtitle}</p>
+              )}
+            </div>
 
-        {/* Contact links */}
-        {content.links && (
-          <div className="flex-1 space-y-2 overflow-hidden">
-            {content.links.map((link, index) => {
-              const IconComponent = Icons[link.icon as keyof typeof Icons];
-              return (
+            {/* Thin separator */}
+            <div
+              className="mb-2"
+              style={{
+                height: '1px',
+                background: `linear-gradient(90deg, ${gradientFrom}60, transparent)`,
+              }}
+            />
+
+            {/* Description */}
+            {content.description && (
+              <p className="text-[10px] text-gray-400 leading-relaxed mb-2">
+                {content.description}
+              </p>
+            )}
+
+            {/* Items list */}
+            {content.items && (
+              <div className="flex-1 space-y-1 overflow-hidden">
+                {content.items.map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between py-1 px-2"
+                    style={{
+                      background: '#111827',
+                      borderLeft: `2px solid ${gradientFrom}80`,
+                    }}
+                  >
+                    <span className="text-[10px] text-gray-400 font-medium">{item.label}</span>
+                    <span
+                      className="text-[10px] font-semibold text-gray-200 text-right"
+                    >
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Contact links */}
+            {content.links && (
+              <div className="flex-1 space-y-1.5 overflow-hidden">
+                {content.links.map((link, index) => {
+                  const IconComponent = Icons[link.icon as keyof typeof Icons];
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2.5 py-1.5 px-2.5"
+                      style={{
+                        background: '#111827',
+                        borderLeft: `2px solid ${gradientFrom}80`,
+                      }}
+                    >
+                      {IconComponent && (
+                        <span style={{ color: gradientFrom }}>
+                          <IconComponent />
+                        </span>
+                      )}
+                      <span className="text-[10px] text-gray-300 font-medium truncate">{link.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Footer highlight badge */}
+            {content.highlight && (
+              <div className="mt-auto pt-2">
                 <div
-                  key={index}
-                  className="flex items-center gap-3 py-2 px-3 rounded-md"
-                  style={{ 
-                    background: `${gradientFrom}25`,
-                    border: `1px solid ${gradientFrom}50`,
+                  className="inline-flex items-center px-2.5 py-1 text-[10px] font-bold"
+                  style={{
+                    background: '#111827',
+                    color: gradientFrom,
+                    borderLeft: `3px solid ${gradientFrom}`,
                   }}
                 >
-                  {IconComponent && (
-                    <span style={{ color: gradientFrom }}>
-                      <IconComponent />
-                    </span>
-                  )}
-                  <span className="text-[10px] text-white font-medium truncate">{link.label}</span>
+                  {content.highlight}
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
-        )}
-
-        {/* Footer highlight badge */}
-        {content.highlight && (
-          <div className="mt-auto pt-3">
-            <div
-              className="inline-flex items-center px-3 py-1.5 rounded-full text-[11px] font-bold"
-              style={{
-                background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`,
-                color: '#fff',
-                boxShadow: `0 2px 10px ${gradientFrom}60`,
-              }}
-            >
-              {content.highlight}
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
