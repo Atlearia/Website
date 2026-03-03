@@ -37,11 +37,14 @@ const CAMERA_DIR = new THREE.Vector3(0, 0, 1);
 const _vFace = new THREE.Vector3();
 
 // Drag feel tuning
-const SENSITIVITY = 0.0035; // radians per pixel
+const DRAG_SENSITIVITY = 0.0035; // radians per pixel — lower = less sensitive drag
 const DRAG_LERP_SPEED = 0.26;
 const IDLE_LERP_SPEED = 0.12;
-const VELOCITY_SMOOTHING = 0.35;
-const SNAP_LOOKAHEAD_SECONDS = 0.18;
+const SNAP_STRENGTH = 0.12;    //12 default  // snap interpolation speed — higher = snappier pull to face (0.05–0.5)
+const VELOCITY_SMOOTHING = 0.5; // how quickly smoothed velocity follows raw input (0–1)
+const FLICK_PULL = 0.28;       // how strongly velocity biases toward the next face (0.1–1.0) — does NOT affect animation speed
+const FLICK_WINDOW_MS = 80;    // only use velocity from the last N ms of the gesture
+const FLICK_DEAD_ZONE = 1.8;   // ignore flick velocity below this threshold (rad/s) — prevents accidental skips
 
 // World-space axes for quaternion drag
 const WORLD_X = new THREE.Vector3(1, 0, 0);
@@ -81,6 +84,8 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   const lastPointerTime = useRef(0);
   const velocityX = useRef(0);
   const velocityY = useRef(0);
+  // Recent move samples for flick detection (ring buffer of last N ms)
+  const moveSamples = useRef<Array<{ dx: number; dy: number; dt: number; time: number }>>([]);
   
   const [isHovered, setIsHovered] = useState(false);
 
@@ -134,6 +139,7 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       lastPointerTime.current = event.timeStamp || performance.now();
       velocityX.current = 0;
       velocityY.current = 0;
+      moveSamples.current = [];
       canvas.style.cursor = 'grabbing';
 
       try {
@@ -149,9 +155,38 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       canvas.style.cursor = isHovered ? 'grab' : 'default';
       event.preventDefault();
 
-      // Project current orientation forward by velocity to pick the snap target
-      _qDeltaY.setFromAxisAngle(WORLD_Y, velocityY.current * SNAP_LOOKAHEAD_SECONDS);
-      _qDeltaX.setFromAxisAngle(WORLD_X, velocityX.current * SNAP_LOOKAHEAD_SECONDS);
+      // Compute flick velocity from recent samples (last FLICK_WINDOW_MS).
+      // This captures the *intent* of a fast swipe even if the pointer barely moved,
+      // matching the standard iOS/Android carousel feel.
+      const now = event.timeStamp || performance.now();
+      const cutoff = now - FLICK_WINDOW_MS;
+      const recent = moveSamples.current.filter(s => s.time >= cutoff);
+      let flickVelX = velocityX.current;
+      let flickVelY = velocityY.current;
+      if (recent.length > 0) {
+        let totalDx = 0, totalDy = 0, totalDt = 0;
+        for (const s of recent) {
+          totalDx += s.dx;
+          totalDy += s.dy;
+          totalDt += s.dt;
+        }
+        if (totalDt > 0) {
+          flickVelX = totalDx / totalDt;
+          flickVelY = totalDy / totalDt;
+        }
+      }
+
+      // Zero out flick if below dead zone — prevents accidental skips when
+      // the cursor slows to a stop near a face edge.
+      const flickSpeed = Math.sqrt(flickVelX * flickVelX + flickVelY * flickVelY);
+      if (flickSpeed < FLICK_DEAD_ZONE) {
+        flickVelX = 0;
+        flickVelY = 0;
+      }
+
+      // Project current orientation forward by flick velocity to pick the snap target
+      _qDeltaY.setFromAxisAngle(WORLD_Y, flickVelY * FLICK_PULL);
+      _qDeltaX.setFromAxisAngle(WORLD_X, flickVelX * FLICK_PULL);
       _qScratch.copy(targetQuat.current).premultiply(_qDeltaX).premultiply(_qDeltaY);
       const closestFace = findClosestFace(_qScratch);
       targetQuat.current.copy(FACE_TARGET_QUATS[closestFace]);
@@ -182,8 +217,8 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
 
       // World-space quaternion drag: dx rotates around world Y, dy around world X.
       // This gives identical drag feel on every face (no gimbal lock).
-      const dRotY = dx * SENSITIVITY;
-      const dRotX = dy * SENSITIVITY;
+      const dRotY = dx * DRAG_SENSITIVITY;
+      const dRotX = dy * DRAG_SENSITIVITY;
       _qDeltaY.setFromAxisAngle(WORLD_Y, dRotY);
       _qDeltaX.setFromAxisAngle(WORLD_X, dRotX);
       // Pre-multiply = world-space rotation
@@ -193,6 +228,14 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       const nextVelX = dRotX / dt;
       velocityX.current = THREE.MathUtils.lerp(velocityX.current, nextVelX, VELOCITY_SMOOTHING);
       velocityY.current = THREE.MathUtils.lerp(velocityY.current, nextVelY, VELOCITY_SMOOTHING);
+
+      // Store sample for flick detection
+      moveSamples.current.push({ dx: dRotX, dy: dRotY, dt, time: now });
+      // Prune old samples outside the flick window
+      const cutoff = now - FLICK_WINDOW_MS * 2;
+      while (moveSamples.current.length > 0 && moveSamples.current[0].time < cutoff) {
+        moveSamples.current.shift();
+      }
 
       lastPointerX.current = event.clientX;
       lastPointerY.current = event.clientY;
@@ -244,7 +287,7 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
     }
 
     // Smooth tracking to target via quaternion slerp.
-    const lerpSpeed = isDragging.current ? DRAG_LERP_SPEED : IDLE_LERP_SPEED;
+    const lerpSpeed = isDragging.current ? DRAG_LERP_SPEED : SNAP_STRENGTH;
     // Ensure shortest-path slerp (avoid the "long way around")
     if (currentQuat.current.dot(targetQuat.current) < 0) {
       targetQuat.current.set(
