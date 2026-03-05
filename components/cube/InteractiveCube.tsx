@@ -55,6 +55,20 @@ const FACE_TARGET_QUATS = FACE_TARGETS.map(([x, y]) =>
   new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, 0, 'YXZ'))
 );
 
+// Deterministic adjacency table: for each face, which face you reach by swiping in each direction.
+// "swipe up" = pointer moves up = reveals the face above, etc.
+const FACE_ADJACENCY: Record<number, { up: number; down: number; left: number; right: number }> = {
+  0: { up: 4, down: 5, left: 2, right: 3 }, // Front  (Ning Ye)
+  1: { up: 4, down: 5, left: 3, right: 2 }, // Back   (Education)
+  2: { up: 4, down: 5, left: 1, right: 0 }, // Right  (Skills)
+  3: { up: 4, down: 5, left: 0, right: 1 }, // Left   (Projects)
+  4: { up: 1, down: 0, left: 2, right: 3 }, // Top    (Experience)
+  5: { up: 0, down: 1, left: 2, right: 3 }, // Bottom (Contact)
+};
+
+// Minimum total drag (radians) to count as an intentional swipe when flick velocity is low
+const MIN_DRAG_FOR_SNAP = 0.25;
+
 // Reusable scratch objects (avoids GC pressure in hot paths)
 const _qDeltaX = new THREE.Quaternion();
 const _qDeltaY = new THREE.Quaternion();
@@ -86,6 +100,8 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
   const velocityY = useRef(0);
   // Recent move samples for flick detection (ring buffer of last N ms)
   const moveSamples = useRef<Array<{ dx: number; dy: number; dt: number; time: number }>>([]);
+  // Tracks which face we are currently snapped to (for adjacency lookup)
+  const currentFaceRef = useRef(0);
   
   const [isHovered, setIsHovered] = useState(false);
 
@@ -118,6 +134,7 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       targetQuat.current.copy(FACE_TARGET_QUATS[targetFace]);
       velocityX.current = 0;
       velocityY.current = 0;
+      currentFaceRef.current = targetFace;
       onFaceChange?.(targetFace);
     }
   }, [targetFace, onFaceChange]);
@@ -155,14 +172,21 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       canvas.style.cursor = isHovered ? 'grab' : 'default';
       event.preventDefault();
 
+      // --- Deterministic adjacency-based snap ---
+      // Sum all drag samples to get net displacement.
+      let netDx = 0; // horizontal (rotY)
+      let netDy = 0; // vertical   (rotX)
+      for (const s of moveSamples.current) {
+        netDx += s.dy; // dy in samples = dRotY (horizontal screen drag)
+        netDy += s.dx; // dx in samples = dRotX (vertical screen drag)
+      }
+
       // Compute flick velocity from recent samples (last FLICK_WINDOW_MS).
-      // This captures the *intent* of a fast swipe even if the pointer barely moved,
-      // matching the standard iOS/Android carousel feel.
       const now = event.timeStamp || performance.now();
       const cutoff = now - FLICK_WINDOW_MS;
       const recent = moveSamples.current.filter(s => s.time >= cutoff);
-      let flickVelX = velocityX.current;
-      let flickVelY = velocityY.current;
+      let flickVelX = 0;
+      let flickVelY = 0;
       if (recent.length > 0) {
         let totalDx = 0, totalDy = 0, totalDt = 0;
         for (const s of recent) {
@@ -175,24 +199,39 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
           flickVelY = totalDy / totalDt;
         }
       }
-
-      // Zero out flick if below dead zone — prevents accidental skips when
-      // the cursor slows to a stop near a face edge.
       const flickSpeed = Math.sqrt(flickVelX * flickVelX + flickVelY * flickVelY);
-      if (flickSpeed < FLICK_DEAD_ZONE) {
-        flickVelX = 0;
-        flickVelY = 0;
+      const totalDrag = Math.sqrt(netDx * netDx + netDy * netDy);
+
+      let nextFace = currentFaceRef.current;
+
+      if (flickSpeed >= FLICK_DEAD_ZONE || totalDrag >= MIN_DRAG_FOR_SNAP) {
+        // Use flick velocity direction if above dead zone, otherwise use net drag direction
+        const dirX = flickSpeed >= FLICK_DEAD_ZONE ? flickVelY : netDx; // horizontal
+        const dirY = flickSpeed >= FLICK_DEAD_ZONE ? flickVelX : netDy; // vertical
+
+        const absX = Math.abs(dirX);
+        const absY = Math.abs(dirY);
+        const adj = FACE_ADJACENCY[currentFaceRef.current];
+
+        if (absY > absX) {
+          // Vertical swipe dominates
+          // dirY > 0 means positive X rotation → top tilts toward camera → reveal top
+          nextFace = dirY > 0 ? adj.up : adj.down;
+        } else {
+          // Horizontal swipe dominates
+          // dirX > 0 means pointer moved right on screen → reveal left face
+          nextFace = dirX > 0 ? adj.right : adj.left;
+        }
+      } else {
+        // Very small drag — use findClosestFace as fallback for slow exploratory drags
+        nextFace = findClosestFace(targetQuat.current);
       }
 
-      // Project current orientation forward by flick velocity to pick the snap target
-      _qDeltaY.setFromAxisAngle(WORLD_Y, flickVelY * FLICK_PULL);
-      _qDeltaX.setFromAxisAngle(WORLD_X, flickVelX * FLICK_PULL);
-      _qScratch.copy(targetQuat.current).premultiply(_qDeltaX).premultiply(_qDeltaY);
-      const closestFace = findClosestFace(_qScratch);
-      targetQuat.current.copy(FACE_TARGET_QUATS[closestFace]);
+      currentFaceRef.current = nextFace;
+      targetQuat.current.copy(FACE_TARGET_QUATS[nextFace]);
       velocityX.current = 0;
       velocityY.current = 0;
-      onFaceChange?.(closestFace);
+      onFaceChange?.(nextFace);
 
       try {
         if (canvas.hasPointerCapture(event.pointerId)) {
@@ -247,6 +286,11 @@ export function InteractiveCube({ onFaceChange, targetFace = 0 }: InteractiveCub
       isDragging.current = false;
       velocityX.current = 0;
       velocityY.current = 0;
+      // Snap back to the current face on lost capture
+      const snapFace = findClosestFace(targetQuat.current);
+      currentFaceRef.current = snapFace;
+      targetQuat.current.copy(FACE_TARGET_QUATS[snapFace]);
+      onFaceChange?.(snapFace);
       activePointerId.current = null;
       canvas.style.cursor = isHovered ? 'grab' : 'default';
     };
