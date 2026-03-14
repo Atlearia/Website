@@ -45,6 +45,8 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         display: ['var(--font-outfit)', 'system-ui', 'sans-serif'],
+        scribe: ['var(--font-ibm-plex-sans)', 'system-ui', 'sans-serif'],
+        manuscript: ['var(--font-cormorant-garamond)', 'Georgia', 'serif'],
       },
       borderRadius: {
         '2xl': '1rem',

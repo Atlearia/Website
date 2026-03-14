@@ -208,11 +208,138 @@ a {
 }
 
 /* ============================================
+   ELVEN HOMEPAGE
+   ============================================ */
+.elven-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(255, 252, 244, 0.94), rgba(246, 240, 229, 0.96) 32%, rgba(233, 225, 210, 0.98) 72%, rgba(220, 212, 196, 1) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(245, 239, 228, 0));
+  color: #19251d;
+}
+
+.elven-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  background-image:
+    linear-gradient(90deg, transparent, rgba(84, 110, 88, 0.2), transparent),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 113px,
+      rgba(84, 110, 88, 0.05) 113px,
+      rgba(84, 110, 88, 0.05) 114px
+    );
+}
+
+.elven-shell {
+  position: relative;
+  z-index: 1;
+}
+
+.elven-panel {
+  background: linear-gradient(145deg, rgba(255, 253, 248, 0.88), rgba(244, 238, 226, 0.78));
+  border: 1px solid rgba(89, 103, 92, 0.16);
+  box-shadow:
+    0 28px 70px rgba(80, 73, 57, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(18px);
+}
+
+.elven-panel-strong {
+  background:
+    linear-gradient(140deg, rgba(255, 253, 249, 0.95), rgba(242, 234, 219, 0.9)),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
+  border: 1px solid rgba(89, 103, 92, 0.18);
+  box-shadow:
+    0 32px 90px rgba(88, 79, 59, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.elven-outline {
+  border: 1px solid rgba(89, 103, 92, 0.14);
+}
+
+.elven-lustre {
+  background-image: linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.45) 18%,
+    rgba(231, 214, 165, 0.42) 32%,
+    rgba(255, 255, 255, 0) 48%
+  );
+  background-size: 220% 100%;
+  animation: elven-lustre 13s linear infinite;
+}
+
+.elven-divider {
+  background: linear-gradient(
+    90deg,
+    rgba(120, 130, 116, 0) 0%,
+    rgba(120, 130, 116, 0.6) 18%,
+    rgba(215, 188, 126, 0.95) 50%,
+    rgba(120, 130, 116, 0.6) 82%,
+    rgba(120, 130, 116, 0) 100%
+  );
+}
+
+.elven-mist {
+  animation: elven-mist 18s ease-in-out infinite alternate;
+}
+
+.elven-tilt {
+  animation: elven-tilt 16s ease-in-out infinite;
+}
+
+@keyframes elven-lustre {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -60% 0;
+  }
+}
+
+@keyframes elven-mist {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+    opacity: 0.42;
+  }
+  100% {
+    transform: translate3d(2%, 2%, 0) scale(1.08);
+    opacity: 0.64;
+  }
+}
+
+@keyframes elven-tilt {
+  0%,
+  100% {
+    transform: rotate(-2deg) translateY(0);
+  }
+  50% {
+    transform: rotate(2deg) translateY(-8px);
+  }
+}
+
+/* ============================================
    SAFE AREA (for mobile devices with notches)
    ============================================ */
 @supports (padding: max(0px)) {
   .safe-area-inset-bottom {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .elven-lustre,
+  .elven-mist,
+  .elven-tilt {
+    animation: none !important;
   }
 }
 

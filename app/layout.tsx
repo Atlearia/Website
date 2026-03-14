@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Outfit } from 'next/font/google';
+import {
+  Cormorant_Garamond,
+  IBM_Plex_Sans,
+  Inter,
+  Outfit,
+} from 'next/font/google';
 import './globals.css';
 import { siteConfig } from '@/content/siteData';
 
@@ -15,6 +20,21 @@ const outfit = Outfit({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-outfit',
+});
+
+// Homepage fonts - scoped so the cube route keeps its existing feel
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-ibm-plex-sans',
+  weight: ['400', '500', '600', '700'],
+});
+
+const cormorantGaramond = Cormorant_Garamond({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-cormorant-garamond',
+  weight: ['400', '500', '600', '700'],
 });
 
 export const metadata: Metadata = {
@@ -44,7 +64,6 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: `${siteConfig.name} | ${siteConfig.title}`,
     description: siteConfig.description,
-    creator: '@yourusername',
   },
   robots: {
     index: true,
@@ -72,7 +91,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
+    <html
+      lang="en"
+      className={`${inter.variable} ${outfit.variable} ${ibmPlexSans.variable} ${cormorantGaramond.variable}`}
+    >
       <body className="min-h-screen bg-background font-sans">
         {/* Skip to main content link for accessibility */}
         <a
