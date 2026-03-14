@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import {
+  Cinzel,
+  Cinzel_Decorative,
   Cormorant_Garamond,
   IBM_Plex_Sans,
   Inter,
@@ -15,14 +17,30 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
-// Display font - headings
+// Display font - headings (fallback for non-fantasy pages)
 const outfit = Outfit({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-outfit',
 });
 
-// Homepage fonts - scoped so the cube route keeps its existing feel
+// Fantasy heading font — medieval serif
+const cinzel = Cinzel({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-cinzel',
+  weight: ['400', '500', '600', '700', '800', '900'],
+});
+
+// Fantasy decorative heading font — ornate medieval serif
+const cinzelDecorative = Cinzel_Decorative({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-cinzel-decorative',
+  weight: ['400', '700', '900'],
+});
+
+// Cube-route fonts — kept for compatibility
 const ibmPlexSans = IBM_Plex_Sans({
   subsets: ['latin'],
   display: 'swap',
@@ -79,7 +97,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0a0a0f',
+  themeColor: '#08060e',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
@@ -93,7 +111,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${outfit.variable} ${ibmPlexSans.variable} ${cormorantGaramond.variable}`}
+      className={`${inter.variable} ${outfit.variable} ${cinzel.variable} ${cinzelDecorative.variable} ${ibmPlexSans.variable} ${cormorantGaramond.variable}`}
     >
       <body className="min-h-screen bg-background font-sans">
         {/* Skip to main content link for accessibility */}

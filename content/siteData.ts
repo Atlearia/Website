@@ -114,9 +114,9 @@ export const siteConfig: SiteConfig = {
 };
 
 export const navLinks: NavLink[] = [
-  { label: 'Builds', href: '#builds' },
-  { label: 'Craft', href: '#craft' },
-  { label: 'Portal', href: '#portal' },
+  { label: 'Quests', href: '#quests' },
+  { label: 'The Forge', href: '#forge' },
+  { label: 'Grimoire', href: '#grimoire' },
 ];
 
 export const proofStats: ProofStat[] = [

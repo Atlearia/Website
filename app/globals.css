@@ -6,9 +6,9 @@
    ROOT VARIABLES
    ============================================ */
 :root {
-  /* Colors are defined in Tailwind config, but we set some CSS variables for special cases */
-  --color-background: #0a0a0f;
-  --color-primary: #6366f1;
+  --color-background: #08060e;
+  --color-primary: #8b5cf6;
+  --color-accent-gold: #d4a044;
   --scroll-behavior: smooth;
 }
 
@@ -33,7 +33,7 @@
    ============================================ */
 html {
   scroll-behavior: var(--scroll-behavior);
-  scroll-padding-top: 5rem; /* Account for fixed navbar */
+  scroll-padding-top: 5rem;
 }
 
 body {
@@ -41,7 +41,6 @@ body {
   font-feature-settings: 'rlig' 1, 'calt' 1;
 }
 
-/* Improve text rendering */
 * {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -51,35 +50,37 @@ body {
    SELECTION
    ============================================ */
 ::selection {
-  @apply bg-primary/30 text-text-primary;
+  background: rgba(139, 92, 246, 0.3);
+  color: #e8e0d0;
 }
 
 /* ============================================
    SCROLLBAR STYLING
    ============================================ */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-background;
+  background: #08060e;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-surface-border rounded-full;
+  background: rgba(139, 92, 246, 0.25);
+  border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-text-muted;
+  background: rgba(139, 92, 246, 0.45);
+  background-clip: content-box;
 }
 
-/* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.08) #0a0a0f;
+  scrollbar-color: rgba(139, 92, 246, 0.2) #08060e;
 }
 
 /* ============================================
@@ -89,7 +90,6 @@ body {
   @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
 }
 
-/* Remove focus ring for mouse users */
 :focus:not(:focus-visible) {
   outline: none;
 }
@@ -98,7 +98,6 @@ body {
    TYPOGRAPHY
    ============================================ */
 h1, h2, h3, h4, h5, h6 {
-  @apply font-display;
   text-wrap: balance;
 }
 
@@ -125,7 +124,7 @@ a {
 }
 
 /* ============================================
-   CUBE 3D STABILITY
+   CUBE 3D STABILITY (DO NOT TOUCH)
    ============================================ */
 .cube-scene-wrapper,
 .cube-canvas-3d,
@@ -202,128 +201,164 @@ a {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  opacity: 0.02;
+  opacity: 0.03;
   z-index: 9999;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
 /* ============================================
-   ELVEN HOMEPAGE
+   FANTASY HOMEPAGE DESIGN SYSTEM
    ============================================ */
-.elven-page {
+
+/* Main page wrapper — deep dark with nebula gradient */
+.fantasy-page {
   position: relative;
   isolation: isolate;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top, rgba(255, 252, 244, 0.94), rgba(246, 240, 229, 0.96) 32%, rgba(233, 225, 210, 0.98) 72%, rgba(220, 212, 196, 1) 100%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(245, 239, 228, 0));
-  color: #19251d;
+    radial-gradient(ellipse at 20% 0%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(212, 160, 68, 0.04) 0%, transparent 40%),
+    radial-gradient(ellipse at 50% 100%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+    linear-gradient(180deg, #08060e 0%, #0a0814 40%, #0e0b18 70%, #08060e 100%);
+  color: #e8e0d0;
 }
 
-.elven-page::before {
+/* Subtle vignette overlay */
+.fantasy-page::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.18;
-  background-image:
-    linear-gradient(90deg, transparent, rgba(84, 110, 88, 0.2), transparent),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0,
-      transparent 113px,
-      rgba(84, 110, 88, 0.05) 113px,
-      rgba(84, 110, 88, 0.05) 114px
-    );
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.4) 100%);
+  z-index: 0;
 }
 
-.elven-shell {
+/* Content shell above overlays */
+.fantasy-shell {
   position: relative;
   z-index: 1;
 }
 
-.elven-panel {
-  background: linear-gradient(145deg, rgba(255, 253, 248, 0.88), rgba(244, 238, 226, 0.78));
-  border: 1px solid rgba(89, 103, 92, 0.16);
-  box-shadow:
-    0 28px 70px rgba(80, 73, 57, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(18px);
-}
-
-.elven-panel-strong {
-  background:
-    linear-gradient(140deg, rgba(255, 253, 249, 0.95), rgba(242, 234, 219, 0.9)),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
-  border: 1px solid rgba(89, 103, 92, 0.18);
-  box-shadow:
-    0 32px 90px rgba(88, 79, 59, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.88);
-}
-
-.elven-outline {
-  border: 1px solid rgba(89, 103, 92, 0.14);
-}
-
-.elven-lustre {
-  background-image: linear-gradient(
-    115deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.45) 18%,
-    rgba(231, 214, 165, 0.42) 32%,
-    rgba(255, 255, 255, 0) 48%
+/* Dark glass panel — primary card style */
+.fantasy-panel {
+  background: linear-gradient(
+    145deg,
+    rgba(14, 11, 24, 0.85),
+    rgba(22, 18, 36, 0.7)
   );
-  background-size: 220% 100%;
-  animation: elven-lustre 13s linear infinite;
+  border: 1px solid rgba(139, 92, 246, 0.12);
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(139, 92, 246, 0.08);
+  backdrop-filter: blur(20px);
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
-.elven-divider {
+.fantasy-panel:hover {
+  border-color: rgba(139, 92, 246, 0.25);
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(139, 92, 246, 0.08),
+    inset 0 1px 0 rgba(139, 92, 246, 0.12);
+}
+
+/* Stronger panel variant — featured cards */
+.fantasy-panel-strong {
+  background: linear-gradient(
+    140deg,
+    rgba(14, 11, 24, 0.92),
+    rgba(22, 18, 36, 0.82)
+  );
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  box-shadow:
+    0 32px 90px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(139, 92, 246, 0.06),
+    inset 0 1px 0 rgba(139, 92, 246, 0.1);
+  backdrop-filter: blur(24px);
+}
+
+/* Gold-to-purple divider line */
+.fantasy-divider {
+  height: 1px;
   background: linear-gradient(
     90deg,
-    rgba(120, 130, 116, 0) 0%,
-    rgba(120, 130, 116, 0.6) 18%,
-    rgba(215, 188, 126, 0.95) 50%,
-    rgba(120, 130, 116, 0.6) 82%,
-    rgba(120, 130, 116, 0) 100%
+    rgba(139, 92, 246, 0) 0%,
+    rgba(139, 92, 246, 0.5) 18%,
+    rgba(212, 160, 68, 0.9) 50%,
+    rgba(139, 92, 246, 0.5) 82%,
+    rgba(139, 92, 246, 0) 100%
   );
 }
 
-.elven-mist {
-  animation: elven-mist 18s ease-in-out infinite alternate;
+/* Ambient glow orb */
+.fantasy-glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  animation: fantasyGlow 4s ease-in-out infinite;
 }
 
-.elven-tilt {
-  animation: elven-tilt 16s ease-in-out infinite;
+/* Sweeping lustre effect across panels */
+.fantasy-lustre {
+  background-image: linear-gradient(
+    115deg,
+    rgba(139, 92, 246, 0) 0%,
+    rgba(139, 92, 246, 0.12) 18%,
+    rgba(212, 160, 68, 0.1) 32%,
+    rgba(139, 92, 246, 0) 48%
+  );
+  background-size: 220% 100%;
+  animation: fantasyLustre 13s linear infinite;
 }
 
-@keyframes elven-lustre {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -60% 0;
-  }
+@keyframes fantasyLustre {
+  0% { background-position: 200% 0; }
+  100% { background-position: -60% 0; }
 }
 
-@keyframes elven-mist {
-  0% {
-    transform: translate3d(-2%, -1%, 0) scale(1);
-    opacity: 0.42;
-  }
-  100% {
-    transform: translate3d(2%, 2%, 0) scale(1.08);
-    opacity: 0.64;
-  }
+/* Floating ambient particles */
+.fantasy-particle {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: rgba(212, 160, 68, 0.6);
+  pointer-events: none;
+  animation: fantasyParticleFloat 12s ease-in-out infinite;
 }
 
-@keyframes elven-tilt {
-  0%,
-  100% {
-    transform: rotate(-2deg) translateY(0);
+@keyframes fantasyParticleFloat {
+  0%, 100% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
   }
   50% {
-    transform: rotate(2deg) translateY(-8px);
+    transform: translateY(-120px) translateX(30px) scale(0.5);
+    opacity: 0.4;
   }
+  90% {
+    opacity: 0;
+  }
+}
+
+/* Rune-inscribed text glow */
+.fantasy-text-glow {
+  text-shadow:
+    0 0 20px rgba(139, 92, 246, 0.3),
+    0 0 40px rgba(139, 92, 246, 0.15),
+    0 0 80px rgba(139, 92, 246, 0.05);
+}
+
+/* Gold text glow */
+.fantasy-text-gold {
+  color: #d4a044;
+  text-shadow:
+    0 0 15px rgba(212, 160, 68, 0.3),
+    0 0 30px rgba(212, 160, 68, 0.1);
 }
 
 /* ============================================
@@ -336,9 +371,9 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .elven-lustre,
-  .elven-mist,
-  .elven-tilt {
+  .fantasy-lustre,
+  .fantasy-glow-orb,
+  .fantasy-particle {
     animation: none !important;
   }
 }

@@ -1,5 +1,5 @@
-import { ElvenHomepage } from '@/components/ElvenHomepage';
+import { FantasyHomepage } from '@/components/FantasyHomepage';
 
 export default function Home() {
-  return <ElvenHomepage />;
+  return <FantasyHomepage />;
 }
