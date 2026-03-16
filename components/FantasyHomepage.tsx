@@ -361,14 +361,7 @@ export function FantasyHomepage() {
             <div className="relative z-[2] mx-auto flex min-h-screen max-w-6xl items-center px-4 pt-20 sm:px-6 lg:px-8">
               <div className="grid w-full gap-10 lg:grid-cols-[minmax(0,1.3fr)_22rem] lg:items-center">
                 <Reveal direction="left" className="space-y-8">
-                  {/* Eyebrow badge */}
-                  <div className="inline-flex items-center gap-3 rounded-full border border-[rgba(212,160,68,0.2)] bg-[rgba(6,4,12,0.5)] px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-accent-light backdrop-blur-md">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-50" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent" />
-                    </span>
-                    {siteConfig.heroEyebrow}
-                  </div>
+
 
                   {/* Title — huge, dramatic */}
                   <div className="space-y-6">
@@ -408,33 +401,57 @@ export function FantasyHomepage() {
                   </div>
                 </Reveal>
 
-                {/* Right sidebar — Field notes */}
+                {/* Right sidebar — Academy card */}
                 <Reveal direction="right" delay={0.15}>
-                  <div className="space-y-5">
-                    <div className="fantasy-panel-strong fantasy-border-glow relative overflow-hidden rounded-[2rem] p-6">
-                      <div className="fantasy-lustre pointer-events-none absolute inset-0 opacity-50" />
-                      <div className="relative">
-                        <p className="flex items-center gap-2.5 text-[0.68rem] font-bold uppercase tracking-[0.34em] text-accent-light">
-                          <span className="h-4 w-4 opacity-70"><ScrollIcon /></span>
-                          Field notes
+                  <div className="space-y-4">
+                    {/* Fantasy Concordia image */}
+                    <div className="fantasy-panel-strong fantasy-border-glow relative overflow-hidden rounded-[2rem]">
+                      <div className="fantasy-lustre pointer-events-none absolute inset-0 z-10 opacity-40" />
+                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-[2rem]">
+                        <Image
+                          src="/fantasy/concordia-academy.png"
+                          alt="Concordia University — reimagined as a magical academy"
+                          fill
+                          quality={85}
+                          className="object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[rgba(14,10,32,1)] via-[rgba(14,10,32,0.3)] to-transparent" />
+                      </div>
+
+                      {/* Academy info overlay at bottom of image */}
+                      <div className="relative px-5 pb-5 -mt-8 z-[2]">
+                        <p className="flex items-center gap-2 text-[0.62rem] font-bold uppercase tracking-[0.34em] text-accent-light/80">
+                          <span className="h-3.5 w-3.5 opacity-70"><ShieldIcon /></span>
+                          Academy
                         </p>
-                        <div className="my-5 w-full fantasy-divider" />
-                        <div className="space-y-5">
+                        <h3 className="mt-1.5 font-cinzel text-lg font-bold text-text-primary leading-tight">
+                          Concordia University
+                        </h3>
+                        <p className="mt-1 text-xs text-text-muted tracking-wide">
+                          B.Eng Software Engineering (Co-op)
+                        </p>
+
+                        <div className="my-4 w-full fantasy-divider" />
+
+                        {/* Arcane Standing GPA */}
+                        <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-xs uppercase tracking-[0.28em] text-text-muted">Availability</p>
-                            <p className="mt-2 text-base leading-7 text-text-secondary">{siteConfig.availability}</p>
+                            <p className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-text-muted">
+                              Arcane Standing <span className="text-text-muted/50">(GPA)</span>
+                            </p>
                           </div>
-                          <div>
-                            <p className="text-xs uppercase tracking-[0.28em] text-text-muted">Current focus</p>
-                            <div className="mt-3 space-y-3">
-                              {siteConfig.currentFocus.map((focus) => (
-                                <div key={focus} className="flex items-start gap-3 text-sm leading-6 text-text-secondary">
-                                  <span className="mt-2 h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_6px_rgba(212,160,68,0.5)]" />
-                                  <span>{focus}</span>
-                                </div>
-                              ))}
+                          <p className="font-cinzel text-2xl font-bold fantasy-text-gold fantasy-stat-glow">
+                            4.2<span className="text-lg text-accent/60">/4.3</span>
+                          </p>
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                          {siteConfig.currentFocus.slice(0, 2).map((focus) => (
+                            <div key={focus} className="flex items-start gap-2.5 text-[0.78rem] leading-5 text-text-secondary">
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent shadow-[0_0_6px_rgba(212,160,68,0.5)]" />
+                              <span>{focus}</span>
                             </div>
-                          </div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -443,27 +460,14 @@ export function FantasyHomepage() {
               </div>
             </div>
 
-            {/* Scroll indicator */}
-            <motion.div
-              className="absolute bottom-8 left-1/2 z-[3] -translate-x-1/2"
-              animate={prefersReducedMotion ? undefined : { y: [0, 10, 0] }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              aria-hidden="true"
-            >
-              <div className="flex flex-col items-center gap-2 text-text-muted/50">
-                <span className="text-[0.6rem] uppercase tracking-[0.3em] font-cinzel">Scroll to begin</span>
-                <svg width="16" height="24" viewBox="0 0 16 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M8 4v12M4 12l4 4 4-4" />
-                </svg>
-              </div>
-            </motion.div>
+
           </section>
 
-          {/* ── Proof stats bar ── */}
+          {/* ── Proof stats bar (without GPA — it's now in the hero) ── */}
           <section className="relative z-[1] -mt-2">
             <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-              <RevealGroup className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" staggerDelay={0.08}>
-                {proofStats.map((stat) => (
+              <RevealGroup className="grid gap-4 sm:grid-cols-3" staggerDelay={0.08}>
+                {proofStats.filter((stat) => stat.label !== 'Arcane Standing').map((stat) => (
                   <RevealItem key={stat.label}>
                     <div className="fantasy-panel fantasy-border-glow rounded-2xl p-5 text-center">
                       <p className="text-[0.65rem] font-bold uppercase tracking-[0.34em] text-text-muted">

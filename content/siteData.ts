@@ -121,8 +121,8 @@ export const navLinks: NavLink[] = [
 
 export const proofStats: ProofStat[] = [
   {
-    label: 'GPA',
-    value: '4.17 / 4.30',
+    label: 'Arcane Standing',
+    value: '4.2 / 4.3',
     detail: 'Strong academic footing while staying active in build-heavy work.',
   },
   {
