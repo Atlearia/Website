@@ -463,26 +463,8 @@ export function FantasyHomepage() {
 
           </section>
 
-          {/* ── Proof stats bar (without GPA — it's now in the hero) ── */}
-          <section className="relative z-[1] -mt-2">
-            <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-              <RevealGroup className="grid gap-4 sm:grid-cols-3" staggerDelay={0.08}>
-                {proofStats.filter((stat) => stat.label !== 'Arcane Standing').map((stat) => (
-                  <RevealItem key={stat.label}>
-                    <div className="fantasy-panel fantasy-border-glow rounded-2xl p-5 text-center">
-                      <p className="text-[0.65rem] font-bold uppercase tracking-[0.34em] text-text-muted">
-                        {stat.label}
-                      </p>
-                      <p className="mt-2 font-cinzel text-3xl font-bold fantasy-text-gold fantasy-stat-glow">
-                        {stat.value}
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-text-muted">{stat.detail}</p>
-                    </div>
-                  </RevealItem>
-                ))}
-              </RevealGroup>
-            </div>
-          </section>
+
+
 
           {/* ── Ornate divider ── */}
           <OrnateDivider />
