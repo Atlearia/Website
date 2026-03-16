@@ -74,6 +74,7 @@ export interface FeaturedBuild {
   liveUrl?: string;
   liveLabel?: string;
   status: string;
+  awarded?: boolean;
 }
 
 export interface EngineeringPillar {
@@ -150,9 +151,10 @@ export const featuredBuilds: FeaturedBuild[] = [
       'Shipped a localization-ready mobile application with realtime distance tracking in a single 24-hour build window.',
     impact:
       'Won 1st Place and Best UI Design by pairing fast implementation with disciplined frontend polish.',
-    stack: ['Flutter', 'Firebase', 'Dart', 'Localization', 'Realtime'],
+    stack: ['Flutter', 'Firebase', 'Dart'],
     githubUrl: siteConfig.githubUrl,
     status: 'Award-winning sprint build',
+    awarded: true,
   },
   {
     id: 'codejam-platform',
@@ -161,9 +163,10 @@ export const featuredBuilds: FeaturedBuild[] = [
       'Built a cross-platform event discovery product with AI-assisted recommendations and a full-stack admin flow during a 48-hour hackathon.',
     impact:
       'Connected a Flutter client, NestJS backend, PocketBase data layer, and Next.js admin tools into one coherent system.',
-    stack: ['Flutter', 'NestJS', 'PocketBase', 'Next.js', 'AI tooling'],
+    stack: ['Flutter', 'NestJS', 'PocketBase'],
     githubUrl: siteConfig.githubUrl,
     status: '48-hour full-stack system',
+    awarded: true,
   },
   {
     id: 'portfolio-cube',
@@ -172,11 +175,78 @@ export const featuredBuilds: FeaturedBuild[] = [
       'Designed this portfolio as a crafted web surface, then paired it with a separate interactive cube route to make the experience feel authored instead of templated.',
     impact:
       'Uses Next.js, motion design, and a custom 3D layer to show both interface taste and willingness to build unusual interactions well.',
-    stack: ['Next.js', 'TypeScript', 'Framer Motion', 'Three.js'],
+    stack: ['Next.js', 'Three.js', 'Framer Motion'],
     githubUrl: siteConfig.githubUrl,
     liveUrl: siteConfig.cubeHref,
     liveLabel: 'Enter the cube',
     status: 'Interactive web experiment',
+    awarded: true,
+  },
+  {
+    id: 'ai-study-assistant',
+    title: 'AI Study Assistant',
+    summary:
+      'Built an AI-powered study tool that generates flashcards and quizzes from lecture notes using natural language processing.',
+    impact:
+      'Helped streamline exam prep by turning unstructured notes into structured, testable content automatically.',
+    stack: ['Python', 'OpenAI', 'React'],
+    githubUrl: siteConfig.githubUrl,
+    status: 'AI-powered learning tool',
+  },
+  {
+    id: 'discord-community-bot',
+    title: 'Discord Community Manager',
+    summary:
+      'Developed a full-featured Discord bot handling moderation, role management, and automated event scheduling for communities.',
+    impact:
+      'Managed communities with thousands of members, reducing moderation workload through intelligent automation.',
+    stack: ['Node.js', 'Discord.js', 'MongoDB'],
+    githubUrl: siteConfig.githubUrl,
+    status: 'Community automation platform',
+  },
+  {
+    id: 'real-estate-scraper',
+    title: 'Real Estate Market Tracker',
+    summary:
+      'Created an automated web scraper that aggregates rental listings and visualizes market trends across Montreal neighborhoods.',
+    impact:
+      'Provides real-time pricing data and historical trend analysis to help identify optimal rental timing.',
+    stack: ['Python', 'Selenium', 'PostgreSQL'],
+    githubUrl: siteConfig.githubUrl,
+    status: 'Data pipeline & visualization',
+  },
+  {
+    id: 'fitness-tracker-api',
+    title: 'Fitness Tracker REST API',
+    summary:
+      'Engineered a RESTful API for tracking workout routines, nutrition logs, and progress metrics with JWT authentication.',
+    impact:
+      'Clean separation of concerns with typed endpoints, middleware chains, and comprehensive test coverage.',
+    stack: ['NestJS', 'TypeScript', 'Prisma'],
+    githubUrl: siteConfig.githubUrl,
+    status: 'Full-stack API design',
+  },
+  {
+    id: 'e-commerce-dashboard',
+    title: 'E-Commerce Admin Dashboard',
+    summary:
+      'Built a responsive admin panel for managing products, orders, and customer data with real-time analytics charts.',
+    impact:
+      'Features server-side pagination, role-based access control, and live sales metrics with WebSocket updates.',
+    stack: ['React', 'Node.js', 'Chart.js'],
+    githubUrl: siteConfig.githubUrl,
+    status: 'Full-stack dashboard',
+  },
+  {
+    id: 'cli-task-manager',
+    title: 'CLI Task Manager',
+    summary:
+      'Developed a terminal-based project management tool with kanban board visualization, time tracking, and Git integration.',
+    impact:
+      'Designed for developers who prefer staying in the terminal without sacrificing visual project status overview.',
+    stack: ['Rust', 'SQLite', 'Crossterm'],
+    githubUrl: siteConfig.githubUrl,
+    status: 'Developer productivity tool',
   },
 ];
 

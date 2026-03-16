@@ -10,7 +10,6 @@ import {
   featuredBuilds,
   navLinks,
   primaryLinks,
-  proofStats,
   siteConfig,
 } from '@/content/siteData';
 
@@ -489,66 +488,90 @@ export function FantasyHomepage() {
                 <SectionHeading
                   eyebrow="Quests completed"
                   title="Projects that show how I think when the work has to feel finished."
-                  copy="A small set of projects is enough here. I care more about range and execution quality than stacking cards for the sake of it."
+                  copy="Range and execution quality matter more than stacking cards for the sake of it."
                 />
               </Reveal>
 
-              <RevealGroup className="mt-12 grid gap-6 lg:grid-cols-3" staggerDelay={0.12}>
-                {featuredBuilds.map((build, index) => (
+              <RevealGroup className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" staggerDelay={0.06}>
+                {featuredBuilds.map((build) => (
                   <RevealItem key={build.id}>
-                    <article className="fantasy-panel fantasy-border-glow group relative flex h-full flex-col overflow-hidden rounded-[2rem] p-6 transition-transform hover:-translate-y-1">
-                      <div className="absolute inset-x-6 top-0 fantasy-divider opacity-50" />
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-[0.68rem] font-bold uppercase tracking-[0.34em] text-text-muted">
-                            {build.status}
-                          </p>
-                          <h3 className="mt-3 font-cinzel text-2xl font-bold leading-tight text-text-primary sm:text-3xl">
-                            {build.title}
-                          </h3>
+                    <article
+                      className={`group relative flex aspect-square flex-col overflow-hidden rounded-2xl p-5 transition-transform hover:-translate-y-1 ${
+                        build.awarded
+                          ? 'fantasy-panel-strong fantasy-crystal-border'
+                          : 'fantasy-panel fantasy-border-glow'
+                      }`}
+                    >
+                      {/* Crystal crown for awarded projects */}
+                      {build.awarded && (
+                        <div className="absolute -top-1 left-1/2 z-10 -translate-x-1/2" aria-hidden="true">
+                          <div className="relative">
+                            <svg width="36" height="28" viewBox="0 0 36 28" className="drop-shadow-[0_0_8px_rgba(103,232,249,0.6)]">
+                              {/* Crown base */}
+                              <path d="M4 24h28v3H4z" fill="url(#crownGold)" />
+                              {/* Crown body */}
+                              <path d="M4 24 L1 8 L9 16 L18 2 L27 16 L35 8 L32 24Z" fill="url(#crownGold)" stroke="rgba(103,232,249,0.6)" strokeWidth="0.5" />
+                              {/* Gems */}
+                              <circle cx="18" cy="15" r="2.5" fill="rgba(103,232,249,0.9)" />
+                              <circle cx="10" cy="18" r="1.5" fill="rgba(167,139,250,0.8)" />
+                              <circle cx="26" cy="18" r="1.5" fill="rgba(167,139,250,0.8)" />
+                              <defs>
+                                <linearGradient id="crownGold" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="rgba(244,199,107,0.95)" />
+                                  <stop offset="100%" stopColor="rgba(212,160,68,0.85)" />
+                                </linearGradient>
+                              </defs>
+                            </svg>
+                            {/* Glow behind crown */}
+                            <div className="absolute inset-0 -top-1 blur-lg bg-[rgba(103,232,249,0.15)]" />
+                          </div>
                         </div>
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[rgba(212,160,68,0.2)] bg-[rgba(212,160,68,0.08)] font-cinzel text-sm font-bold text-accent-light shadow-[0_0_15px_rgba(212,160,68,0.1)]">
-                          0{index + 1}
+                      )}
+
+                      {/* Card content */}
+                      <div className="relative flex h-full flex-col">
+                        <h3 className={`font-cinzel text-lg font-bold leading-tight text-text-primary ${build.awarded ? 'mt-3' : ''}`}>
+                          {build.title}
+                        </h3>
+
+                        <p className="mt-3 flex-1 text-[0.82rem] leading-6 text-text-secondary line-clamp-4">
+                          {build.summary}
+                        </p>
+
+                        {/* Tech stack */}
+                        <div className="mt-auto pt-3">
+                          <div className="flex flex-wrap gap-1.5">
+                            {build.stack.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full border border-[rgba(212,160,68,0.15)] bg-[rgba(212,160,68,0.05)] px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.1em] text-accent-light/80"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+
+                          {/* Action links */}
+                          <div className="mt-3 flex gap-2">
+                            {build.liveUrl && (
+                              <SmartActionLink
+                                href={build.liveUrl}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,160,68,0.25)] bg-[rgba(212,160,68,0.1)] px-3 py-1.5 text-[0.7rem] font-bold text-accent-light transition-all hover:-translate-y-0.5 hover:shadow-[0_0_15px_rgba(212,160,68,0.2)]"
+                              >
+                                {build.liveLabel ?? 'Live'}
+                                <span className="h-3 w-3"><ArrowIcon /></span>
+                              </SmartActionLink>
+                            )}
+                            <SmartActionLink
+                              href={build.githubUrl}
+                              external
+                              className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(139,92,246,0.2)] bg-[rgba(139,92,246,0.06)] px-3 py-1.5 text-[0.7rem] font-bold text-primary-light transition-all hover:-translate-y-0.5 hover:border-[rgba(139,92,246,0.35)]"
+                            >
+                              Code
+                              <span className="h-3 w-3"><ExternalIcon /></span>
+                            </SmartActionLink>
+                          </div>
                         </div>
-                      </div>
-
-                      <p className="mt-6 text-base leading-7 text-text-secondary">{build.summary}</p>
-                      <p className="mt-4 text-sm leading-7 text-text-muted">{build.impact}</p>
-
-                      <div className="mt-6 flex flex-wrap gap-2">
-                        {build.stack.map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-full border border-[rgba(212,160,68,0.18)] bg-[rgba(212,160,68,0.06)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-accent-light shadow-[inset_0_0_8px_rgba(212,160,68,0.05)]"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-
-                      <div className="mt-auto flex flex-wrap gap-3 pt-8">
-                        {build.liveUrl ? (
-                          <SmartActionLink
-                            href={build.liveUrl}
-                            className="inline-flex items-center gap-2 rounded-full border border-[rgba(212,160,68,0.3)] bg-gradient-to-r from-[rgba(212,160,68,0.15)] to-[rgba(139,92,246,0.1)] px-4 py-2.5 text-sm font-bold text-accent-light transition-all hover:-translate-y-0.5 hover:shadow-[0_0_25px_rgba(212,160,68,0.2)]"
-                          >
-                            {build.liveLabel ?? 'View live'}
-                            <span className="h-4 w-4">
-                              <ArrowIcon />
-                            </span>
-                          </SmartActionLink>
-                        ) : null}
-
-                        <SmartActionLink
-                          href={build.githubUrl}
-                          external
-                          className="inline-flex items-center gap-2 rounded-full border border-[rgba(139,92,246,0.2)] bg-[rgba(139,92,246,0.08)] px-4 py-2.5 text-sm font-bold text-primary-light transition-all hover:-translate-y-0.5 hover:border-[rgba(139,92,246,0.35)] hover:shadow-[0_0_20px_rgba(139,92,246,0.15)]"
-                        >
-                          View code
-                          <span className="h-4 w-4">
-                            <ExternalIcon />
-                          </span>
-                        </SmartActionLink>
                       </div>
                     </article>
                   </RevealItem>
