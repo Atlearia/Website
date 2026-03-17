@@ -75,6 +75,7 @@ export interface FeaturedBuild {
   liveLabel?: string;
   status: string;
   awarded?: boolean;
+  award?: string;
 }
 
 export interface EngineeringPillar {
@@ -155,6 +156,7 @@ export const featuredBuilds: FeaturedBuild[] = [
     githubUrl: siteConfig.githubUrl,
     status: 'Award-winning sprint build',
     awarded: true,
+    award: '1st Place',
   },
   {
     id: 'codejam-platform',
@@ -167,6 +169,7 @@ export const featuredBuilds: FeaturedBuild[] = [
     githubUrl: siteConfig.githubUrl,
     status: '48-hour full-stack system',
     awarded: true,
+    award: '1st Place',
   },
   {
     id: 'portfolio-cube',
@@ -181,6 +184,7 @@ export const featuredBuilds: FeaturedBuild[] = [
     liveLabel: 'Enter the cube',
     status: 'Interactive web experiment',
     awarded: true,
+    award: '1st Place',
   },
   {
     id: 'ai-study-assistant',

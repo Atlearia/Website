@@ -480,7 +480,7 @@ export function FantasyHomepage() {
                 quality={80}
                 className="object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-[rgba(6,4,12,1)] via-[rgba(6,4,12,0.5)] to-[rgba(6,4,12,1)]" />
+              <div className="absolute inset-0 bg-gradient-to-b from-[rgba(6,4,12,0.9)] via-[rgba(6,4,12,0.35)] to-[rgba(6,4,12,0.9)]" />
             </div>
 
             <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
@@ -492,90 +492,118 @@ export function FantasyHomepage() {
                 />
               </Reveal>
 
-              <RevealGroup className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" staggerDelay={0.06}>
-                {featuredBuilds.map((build) => (
+
+              <RevealGroup className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3" staggerDelay={0.06}>
+                {featuredBuilds.map((build, idx) => {
+                  // Each awarded card gets a different frame variant for comparison
+                  const frameFiles = [
+                    'winner-frame-a-removebg-preview',
+                    'winner-frame-b',
+                    'winner-frame-c',
+                  ];
+                  const frameSrc = build.awarded
+                    ? `/fantasy/${frameFiles[idx % frameFiles.length]}.png`
+                    : '';
+
+                  return (
                   <RevealItem key={build.id}>
-                    <article
-                      className={`group relative flex aspect-square flex-col overflow-hidden rounded-2xl p-5 transition-transform hover:-translate-y-1 ${
-                        build.awarded
-                          ? 'fantasy-panel-strong fantasy-crystal-border'
-                          : 'fantasy-panel fantasy-border-glow'
+                    {/* Wrapper — awarded cards get padding for the ornate frame border */}
+                    <div
+                      className={`relative transition-transform hover:-translate-y-1 ${
+                        build.awarded ? 'fantasy-winner-card p-3' : ''
                       }`}
                     >
-                      {/* Crystal crown for awarded projects */}
+                      {/* Winner frame — ornate gold/purple border around the card */}
                       {build.awarded && (
-                        <div className="absolute -top-1 left-1/2 z-10 -translate-x-1/2" aria-hidden="true">
-                          <div className="relative">
-                            <svg width="36" height="28" viewBox="0 0 36 28" className="drop-shadow-[0_0_8px_rgba(103,232,249,0.6)]">
-                              {/* Crown base */}
-                              <path d="M4 24h28v3H4z" fill="url(#crownGold)" />
-                              {/* Crown body */}
-                              <path d="M4 24 L1 8 L9 16 L18 2 L27 16 L35 8 L32 24Z" fill="url(#crownGold)" stroke="rgba(103,232,249,0.6)" strokeWidth="0.5" />
-                              {/* Gems */}
-                              <circle cx="18" cy="15" r="2.5" fill="rgba(103,232,249,0.9)" />
-                              <circle cx="10" cy="18" r="1.5" fill="rgba(167,139,250,0.8)" />
-                              <circle cx="26" cy="18" r="1.5" fill="rgba(167,139,250,0.8)" />
-                              <defs>
-                                <linearGradient id="crownGold" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="rgba(244,199,107,0.95)" />
-                                  <stop offset="100%" stopColor="rgba(212,160,68,0.85)" />
-                                </linearGradient>
-                              </defs>
-                            </svg>
-                            {/* Glow behind crown */}
-                            <div className="absolute inset-0 -top-1 blur-lg bg-[rgba(103,232,249,0.15)]" />
+                        <>
+                          <div className={`fantasy-winner-frame ${idx === 0 ? '!mix-blend-mode-normal' : ''}`} style={idx === 0 ? { mixBlendMode: 'normal' } : undefined}>
+                            <Image
+                              src={frameSrc}
+                              alt=""
+                              fill
+                              quality={95}
+                              className="object-fill"
+                              aria-hidden="true"
+                            />
                           </div>
-                        </div>
+
+                          {/* Gold shimmer sweep (skip on first card) */}
+                          {idx !== 0 && <div className="fantasy-winner-shimmer rounded-2xl" />}
+                        </>
                       )}
 
                       {/* Card content */}
-                      <div className="relative flex h-full flex-col">
-                        <h3 className={`font-cinzel text-lg font-bold leading-tight text-text-primary ${build.awarded ? 'mt-3' : ''}`}>
-                          {build.title}
-                        </h3>
+                      <article
+                        className={`relative z-10 flex aspect-square flex-col overflow-hidden rounded-2xl p-5 ${
+                          build.awarded
+                            ? 'fantasy-panel-strong fantasy-winner-border'
+                            : 'fantasy-panel fantasy-border-glow'
+                        }`}
+                      >
+                        <div className="flex h-full flex-col">
+                          <h3 className="font-cinzel text-lg font-bold leading-tight text-text-primary">
+                            {build.title}
+                          </h3>
 
-                        <p className="mt-3 flex-1 text-[0.82rem] leading-6 text-text-secondary line-clamp-4">
-                          {build.summary}
-                        </p>
-
-                        {/* Tech stack */}
-                        <div className="mt-auto pt-3">
-                          <div className="flex flex-wrap gap-1.5">
-                            {build.stack.map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded-full border border-[rgba(212,160,68,0.15)] bg-[rgba(212,160,68,0.05)] px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.1em] text-accent-light/80"
-                              >
-                                {tag}
+                          {build.awarded && (
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="rgba(244,199,107,0.85)" aria-hidden="true">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                              </svg>
+                              <span className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-[#f4c76b]/70">
+                                {build.award}
                               </span>
-                            ))}
-                          </div>
+                            </div>
+                          )}
 
-                          {/* Action links */}
-                          <div className="mt-3 flex gap-2">
-                            {build.liveUrl && (
+                          <p className="mt-3 flex-1 text-[0.82rem] leading-6 text-text-secondary line-clamp-4">
+                            {build.summary}
+                          </p>
+
+                          {/* Tech stack */}
+                          <div className="mt-auto pt-3">
+                            <div className="flex flex-wrap gap-1.5">
+                              {build.stack.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className={`rounded-full px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.1em] ${
+                                    build.awarded
+                                      ? 'border border-[rgba(244,199,107,0.2)] bg-[rgba(244,199,107,0.06)] text-[#f4c76b]/90'
+                                      : 'border border-[rgba(212,160,68,0.15)] bg-[rgba(212,160,68,0.05)] text-accent-light/80'
+                                  }`}
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* Action links */}
+                            <div className="mt-3 flex gap-2">
+                              {build.liveUrl && (
+                                <SmartActionLink
+                                  href={build.liveUrl}
+                                  className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,160,68,0.25)] bg-[rgba(212,160,68,0.1)] px-3 py-1.5 text-[0.7rem] font-bold text-accent-light transition-all hover:-translate-y-0.5 hover:shadow-[0_0_15px_rgba(212,160,68,0.2)]"
+                                >
+                                  {build.liveLabel ?? 'Live'}
+                                  <span className="h-3 w-3"><ArrowIcon /></span>
+                                </SmartActionLink>
+                              )}
                               <SmartActionLink
-                                href={build.liveUrl}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,160,68,0.25)] bg-[rgba(212,160,68,0.1)] px-3 py-1.5 text-[0.7rem] font-bold text-accent-light transition-all hover:-translate-y-0.5 hover:shadow-[0_0_15px_rgba(212,160,68,0.2)]"
+                                href={build.githubUrl}
+                                external
+                                className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(139,92,246,0.2)] bg-[rgba(139,92,246,0.06)] px-3 py-1.5 text-[0.7rem] font-bold text-primary-light transition-all hover:-translate-y-0.5 hover:border-[rgba(139,92,246,0.35)]"
                               >
-                                {build.liveLabel ?? 'Live'}
-                                <span className="h-3 w-3"><ArrowIcon /></span>
+                                Code
+                                <span className="h-3 w-3"><ExternalIcon /></span>
                               </SmartActionLink>
-                            )}
-                            <SmartActionLink
-                              href={build.githubUrl}
-                              external
-                              className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(139,92,246,0.2)] bg-[rgba(139,92,246,0.06)] px-3 py-1.5 text-[0.7rem] font-bold text-primary-light transition-all hover:-translate-y-0.5 hover:border-[rgba(139,92,246,0.35)]"
-                            >
-                              Code
-                              <span className="h-3 w-3"><ExternalIcon /></span>
-                            </SmartActionLink>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </article>
+                      </article>
+                    </div>
                   </RevealItem>
-                ))}
+                  );
+                })}
               </RevealGroup>
             </div>
           </section>
