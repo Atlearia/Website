@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLB Benchmark</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #08080d;
+      font-family: 'Inter', sans-serif;
+      color: #e0e0e8;
+      overflow: hidden;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    /* Benchmark overlay */
+    #bench-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    #bench-panel {
+      width: 700px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 28px 32px;
+      background: rgba(10, 10, 18, 0.92);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(160, 140, 255, 0.12);
+      border-radius: 16px;
+      pointer-events: auto;
+    }
+
+    .bench-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      background: linear-gradient(135deg, #e0d8ff, #a08cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .bench-subtitle {
+      font-size: 12px;
+      color: rgba(200,195,230,0.4);
+      margin-bottom: 20px;
+    }
+
+    #progress-section {
+      margin-bottom: 20px;
+    }
+    .progress-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: rgba(160,140,255,0.6);
+      margin-bottom: 8px;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #a08cff, #80ffb0);
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+    .progress-status {
+      margin-top: 8px;
+      font-size: 13px;
+      color: rgba(200,195,230,0.5);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Results table */
+    #results-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    #results-table th {
+      text-align: left;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: rgba(160,140,255,0.5);
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(160,140,255,0.1);
+    }
+    #results-table td {
+      font-size: 13px;
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      font-family: 'JetBrains Mono', monospace;
+      color: #c8c0e8;
+    }
+    #results-table tr.best td {
+      color: #80ffb0;
+      font-weight: 600;
+    }
+    #results-table tr.worst td {
+      color: rgba(200,195,230,0.35);
+    }
+    .config-name {
+      font-family: 'Inter', sans-serif !important;
+      font-weight: 500;
+    }
+    .delta {
+      font-size: 11px;
+      color: rgba(200,195,230,0.35);
+    }
+    .delta.better { color: #80ffb0; }
+    .delta.worse { color: #ff6060; }
+
+    #winner-banner {
+      display: none;
+      margin-top: 20px;
+      padding: 14px 18px;
+      background: rgba(80, 255, 140, 0.06);
+      border: 1px solid rgba(80, 255, 140, 0.15);
+      border-radius: 10px;
+    }
+    #winner-banner .winner-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: rgba(80, 255, 140, 0.6);
+      margin-bottom: 4px;
+    }
+    #winner-banner .winner-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #80ffb0;
+    }
+    #winner-banner .winner-detail {
+      font-size: 12px;
+      color: rgba(200,195,230,0.5);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="bench-overlay">
+    <div id="bench-panel">
+      <div class="bench-title">Performance Benchmark</div>
+      <div class="bench-subtitle">Testing optimization configurations — model stays at fixed camera distance</div>
+
+      <div id="progress-section">
+        <div class="progress-label">Progress</div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-status" id="progress-status">Loading model...</div>
+      </div>
+
+      <table id="results-table">
+        <thead>
+          <tr>
+            <th>Configuration</th>
+            <th>Avg Frame Time</th>
+            <th>Min / Max</th>
+            <th>Est. Uncapped FPS</th>
+            <th>vs Baseline</th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+
+      <div id="winner-banner">
+        <div class="winner-label">🏆 Recommended Configuration</div>
+        <div class="winner-name" id="winner-name"></div>
+        <div class="winner-detail" id="winner-detail"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./node_modules/three/build/three.module.js",
+      "three/addons/": "./node_modules/three/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+    // ========== CONFIG ==========
+    const BENCH_DURATION_MS = 6000;  // 6 seconds per test
+    const WARMUP_FRAMES = 30;        // discard first frames
+
+    const TEX_PROPS = [
+      'map','normalMap','roughnessMap','metalnessMap',
+      'aoMap','emissiveMap','bumpMap','displacementMap',
+      'alphaMap','envMap','lightMap'
+    ];
+
+    // UI elements
+    const progressFill = document.getElementById('progress-fill');
+    const progressStatus = document.getElementById('progress-status');
+    const resultsBody = document.getElementById('results-body');
+    const winnerBanner = document.getElementById('winner-banner');
+
+    // ========== TEXTURE HELPERS ==========
+    function cloneTextureAtSize(texture, maxSize) {
+      const img = texture.image;
+      if (!img || !img.width) return texture;
+
+      const srcW = img.naturalWidth || img.width;
+      const srcH = img.naturalHeight || img.height;
+
+      if (srcW <= maxSize && srcH <= maxSize) {
+        const t = texture.clone();
+        t.needsUpdate = true;
+        return t;
+      }
+
+      const aspect = srcW / srcH;
+      let newW, newH;
+      if (srcW >= srcH) { newW = maxSize; newH = Math.round(maxSize / aspect); }
+      else { newH = maxSize; newW = Math.round(maxSize * aspect); }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = newW;
+      canvas.height = newH;
+      canvas.getContext('2d').drawImage(img, 0, 0, newW, newH);
+
+      const t = texture.clone();
+      t.image = canvas;
+      t.needsUpdate = true;
+      return t;
+    }
+
+    // Store original textures for restore
+    let originalTextures = new Map(); // material uuid + prop -> original texture
+
+    function setTextureSize(model, maxSize) {
+      model.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) {
+          for (const prop of TEX_PROPS) {
+            const key = mat.uuid + '_' + prop;
+            const origTex = originalTextures.get(key);
+            if (origTex) {
+              const newTex = cloneTextureAtSize(origTex, maxSize);
+              mat[prop] = newTex;
+            }
+          }
+          mat.needsUpdate = true;
+        }
+      });
+    }
+
+    function storeOriginalTextures(model) {
+      model.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) {
+          for (const prop of TEX_PROPS) {
+            if (mat[prop]) {
+              const key = mat.uuid + '_' + prop;
+              if (!originalTextures.has(key)) {
+                originalTextures.set(key, mat[prop]);
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ========== SCENE SETUP ==========
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0f);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    // Lights (will be toggled per test)
+    const ambient = new THREE.AmbientLight(0xc8bfff, 0.4);
+    scene.add(ambient);
+
+    const keyLight = new THREE.DirectionalLight(0xfff5e6, 1.8);
+    keyLight.position.set(5, 8, 4);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 30;
+    keyLight.shadow.camera.left = -10;
+    keyLight.shadow.camera.right = 10;
+    keyLight.shadow.camera.top = 10;
+    keyLight.shadow.camera.bottom = -10;
+    keyLight.shadow.bias = -0.001;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xa0b8ff, 0.6);
+    fillLight.position.set(-4, 3, -2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xd0a0ff, 0.5);
+    rimLight.position.set(-2, 5, -6);
+    scene.add(rimLight);
+
+    const bounceLight = new THREE.HemisphereLight(0x222244, 0x0a0a0f, 0.3);
+    scene.add(bounceLight);
+
+    // Ground
+    const groundGeo = new THREE.CircleGeometry(30, 64);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x0d0d14, roughness: 0.9, metalness: 0 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.01;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const grid = new THREE.GridHelper(30, 60, 0x1a1a2e, 0x12121e);
+    grid.material.opacity = 0.15;
+    grid.material.transparent = true;
+    scene.add(grid);
+
+    // Fog reference
+    const fogInstance = new THREE.FogExp2(0x0a0a0f, 0.015);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ========== LOAD MODEL ==========
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(dracoLoader);
+
+    let model = null;
+    let fixedCameraPos = new THREE.Vector3();
+    let fixedTarget = new THREE.Vector3();
+
+    function loadModel() {
+      return new Promise((resolve, reject) => {
+        gltfLoader.load(
+          './Meshy_AI_Arboreal_Library_0404050326_texture.glb',
+          (gltf) => {
+            model = gltf.scene;
+
+            // Store original textures before any manipulation
+            storeOriginalTextures(model);
+
+            // Center and scale
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = 5 / maxDim;
+
+            model.scale.setScalar(scale);
+            model.position.sub(center.multiplyScalar(scale));
+            model.position.y += (size.y * scale) / 2;
+
+            model.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+              }
+            });
+
+            scene.add(model);
+
+            // Fixed camera for consistent benchmarking
+            const newBox = new THREE.Box3().setFromObject(model);
+            const newCenter = newBox.getCenter(new THREE.Vector3());
+            fixedTarget.copy(newCenter);
+
+            const fov = camera.fov * (Math.PI / 180);
+            const dist = (5 / Math.tan(fov / 2)) * 1.4;
+            fixedCameraPos.set(
+              newCenter.x + dist * 0.6,
+              newCenter.y + dist * 0.35,
+              newCenter.z + dist * 0.7
+            );
+
+            camera.position.copy(fixedCameraPos);
+            camera.lookAt(fixedTarget);
+
+            resolve();
+          },
+          (p) => {
+            if (p.total > 0) {
+              progressStatus.textContent = `Loading model... ${Math.round(p.loaded / p.total * 100)}%`;
+            }
+          },
+          reject
+        );
+      });
+    }
+
+    // ========== BENCHMARK ENGINE ==========
+    function benchmarkConfig(durationMs) {
+      return new Promise((resolve) => {
+        const frameTimes = [];
+        let frameCount = 0;
+        let running = true;
+
+        // Fixed camera position
+        camera.position.copy(fixedCameraPos);
+        camera.lookAt(fixedTarget);
+
+        // Force a few warmup frames
+        for (let i = 0; i < WARMUP_FRAMES; i++) {
+          renderer.render(scene, camera);
+        }
+        // Reset render info
+        renderer.info.reset();
+
+        const startTime = performance.now();
+
+        function frame() {
+          if (!running) return;
+
+          const t0 = performance.now();
+          renderer.render(scene, camera);
+          const t1 = performance.now();
+
+          frameCount++;
+          frameTimes.push(t1 - t0);
+
+          if (t1 - startTime >= durationMs) {
+            running = false;
+            const avg = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+            const sorted = [...frameTimes].sort((a, b) => a - b);
+            const min = sorted[0];
+            const max = sorted[sorted.length - 1];
+            const p95 = sorted[Math.floor(sorted.length * 0.95)];
+            const triangles = renderer.info.render.triangles;
+            const calls = renderer.info.render.calls;
+
+            resolve({
+              avgMs: avg,
+              minMs: min,
+              maxMs: max,
+              p95Ms: p95,
+              frames: frameCount,
+              estFps: 1000 / avg,
+              triangles,
+              calls
+            });
+            return;
+          }
+
+          requestAnimationFrame(frame);
+        }
+
+        requestAnimationFrame(frame);
+      });
+    }
+
+    // ========== OPTIMIZATION CONFIGS ==========
+    const configs = [
+      {
+        name: '1. Baseline (current)',
+        desc: 'Current setup: 2K textures, shadows, AA, fog, all lights',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          ground.receiveShadow = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        }
+      },
+      {
+        name: '2. No Shadows',
+        desc: 'Disable shadow map entirely',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = false;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = false;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; } });
+        }
+      },
+      {
+        name: '3. Lower Shadow Map (1024)',
+        desc: 'Shadow map 1024x1024 instead of 2048',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 1024;
+          keyLight.shadow.mapSize.height = 1024;
+          keyLight.shadow.map = null; // force rebuild
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        }
+      },
+      {
+        name: '4. PCFShadowMap (cheaper filter)',
+        desc: 'PCFShadowMap instead of PCFSoftShadowMap',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          keyLight.shadow.map = null;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        }
+      },
+      {
+        name: '5. Pixel Ratio 1x',
+        desc: 'Render at 1x device pixel ratio',
+        apply: () => {
+          renderer.setPixelRatio(1);
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        }
+      },
+      {
+        name: '6. No Fog',
+        desc: 'Disable exponential fog',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = null;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        }
+      },
+      {
+        name: '7. Minimal Lights (key+ambient)',
+        desc: 'Only key light + ambient, remove fill/rim/bounce',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          fillLight.visible = false;
+          rimLight.visible = false;
+          bounceLight.visible = false;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        }
+      },
+      {
+        name: '8. 1K Textures',
+        desc: 'Textures downscaled to max 1024px',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 1024);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        }
+      },
+      {
+        name: '9. 512px Textures',
+        desc: 'Textures downscaled to max 512px',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 512);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        }
+      },
+      {
+        name: '10. No Tone Mapping',
+        desc: 'LinearToneMapping instead of ACES Filmic',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.NoToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        }
+      },
+      {
+        name: '11. No Grid + No Ground',
+        desc: 'Remove ground plane and grid helper',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = false;
+          grid.visible = false;
+          setTextureSize(model, 2048);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+        }
+      },
+      {
+        name: '12. Static Matrix (freeze transforms)',
+        desc: 'Disable matrixAutoUpdate on all children',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => {
+            c.matrixAutoUpdate = false;
+            c.updateMatrix();
+            if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; }
+          });
+        }
+      },
+      {
+        name: '13. Model: no cast shadow',
+        desc: 'Model meshes don\'t cast shadows (only ground receives)',
+        apply: () => {
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 2048;
+          keyLight.shadow.mapSize.height = 2048;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          ground.receiveShadow = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => { if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; } });
+        }
+      },
+      {
+        name: '14. FULL OPTIMIZE',
+        desc: 'No shadows, 1x DPR, 1K tex, 2 lights, no fog, no grid, static matrix',
+        apply: () => {
+          renderer.setPixelRatio(1);
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          renderer.shadowMap.enabled = false;
+          renderer.toneMapping = THREE.NoToneMapping;
+          scene.fog = null;
+          keyLight.castShadow = false;
+          fillLight.visible = false;
+          rimLight.visible = false;
+          bounceLight.visible = false;
+          ground.visible = false;
+          grid.visible = false;
+          setTextureSize(model, 1024);
+          model.traverse((c) => {
+            c.matrixAutoUpdate = false;
+            c.updateMatrix();
+            if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; }
+          });
+        }
+      },
+      {
+        name: '15. BALANCED (recommended)',
+        desc: 'No shadows, 2K tex, all lights, fog, 1x DPR, static matrix',
+        apply: () => {
+          renderer.setPixelRatio(1);
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          renderer.shadowMap.enabled = false;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          scene.fog = fogInstance;
+          keyLight.castShadow = false;
+          fillLight.visible = true;
+          rimLight.visible = true;
+          bounceLight.visible = true;
+          ground.visible = true;
+          grid.visible = true;
+          setTextureSize(model, 2048);
+          model.traverse((c) => {
+            c.matrixAutoUpdate = false;
+            c.updateMatrix();
+            if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; }
+          });
+        }
+      },
+    ];
+
+    // ========== RUN BENCHMARKS ==========
+    async function runAll() {
+      progressStatus.textContent = 'Loading model...';
+      await loadModel();
+      progressStatus.textContent = 'Model loaded. Starting benchmarks...';
+
+      // Pre-compile shaders
+      renderer.compile(scene, camera);
+
+      const results = [];
+      let baselineAvg = null;
+
+      for (let i = 0; i < configs.length; i++) {
+        const cfg = configs[i];
+        const pct = ((i) / configs.length * 100).toFixed(0);
+        progressFill.style.width = pct + '%';
+        progressStatus.textContent = `Testing ${i + 1}/${configs.length}: ${cfg.name}`;
+
+        // Apply config
+        cfg.apply();
+
+        // Need to recompile after config changes
+        renderer.compile(scene, camera);
+
+        // Benchmark
+        const result = await benchmarkConfig(BENCH_DURATION_MS);
+        results.push({ config: cfg, result });
+
+        if (i === 0) baselineAvg = result.avgMs;
+
+        // Add row to table
+        const delta = baselineAvg ? ((result.avgMs - baselineAvg) / baselineAvg * 100) : 0;
+        const deltaClass = delta < -2 ? 'better' : delta > 2 ? 'worse' : '';
+        const deltaText = i === 0 ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="config-name">${cfg.name}</td>
+          <td>${result.avgMs.toFixed(2)} ms</td>
+          <td>${result.minMs.toFixed(1)} / ${result.maxMs.toFixed(1)} ms</td>
+          <td>${Math.round(result.estFps)} fps</td>
+          <td><span class="delta ${deltaClass}">${deltaText}</span></td>
+        `;
+        resultsBody.appendChild(tr);
+
+        // Restore matrixAutoUpdate for next test
+        model.traverse((c) => { c.matrixAutoUpdate = true; });
+      }
+
+      // Done
+      progressFill.style.width = '100%';
+      progressStatus.textContent = `Done! Tested ${configs.length} configurations.`;
+
+      // Find best
+      const sorted = [...results].sort((a, b) => a.result.avgMs - b.result.avgMs);
+      const best = sorted[0];
+      const worst = sorted[sorted.length - 1];
+
+      // Highlight rows
+      const rows = resultsBody.querySelectorAll('tr');
+      results.forEach((r, i) => {
+        if (r === best) rows[i].classList.add('best');
+        if (r === worst) rows[i].classList.add('worst');
+      });
+
+      // Winner banner
+      const savings = ((baselineAvg - best.result.avgMs) / baselineAvg * 100).toFixed(1);
+      winnerBanner.style.display = 'block';
+      document.getElementById('winner-name').textContent = best.config.name;
+      document.getElementById('winner-detail').textContent =
+        `${best.result.avgMs.toFixed(2)}ms avg frame time (${savings}% faster than baseline) · ~${Math.round(best.result.estFps)} uncapped FPS · ${best.config.desc}`;
+    }
+
+    runAll().catch(console.error);
+  </script>
+</body>
+</html>

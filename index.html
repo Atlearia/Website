@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLB Viewer — Arboreal Library</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0f;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      color: #e0e0e8;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Loading overlay */
+    #loader {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0f;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #loader.hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .loader-ring {
+      width: 56px;
+      height: 56px;
+      border: 3px solid rgba(160, 140, 255, 0.15);
+      border-top-color: #a08cff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loader-text {
+      margin-top: 20px;
+      font-size: 13px;
+      font-weight: 300;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(160, 140, 255, 0.7);
+    }
+
+    .loader-bar {
+      margin-top: 16px;
+      width: 200px;
+      height: 2px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+    .loader-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #a08cff, #c8a0ff);
+      border-radius: 1px;
+      transition: width 0.3s ease;
+    }
+
+    /* HUD overlay */
+    #hud {
+      position: fixed;
+      top: 24px;
+      left: 24px;
+      z-index: 10;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.6s ease 0.3s;
+    }
+    #hud.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .hud-title {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #e0d8ff, #a08cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hud-subtitle {
+      margin-top: 4px;
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: rgba(200, 195, 230, 0.45);
+    }
+
+    /* Controls hint */
+    #controls-hint {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      z-index: 10;
+      display: flex;
+      gap: 20px;
+      opacity: 0;
+      transition: all 0.6s ease 0.5s;
+    }
+    #controls-hint.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .hint-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      color: rgba(200, 195, 230, 0.35);
+    }
+
+    .hint-key {
+      padding: 2px 8px;
+      border: 1px solid rgba(160, 140, 255, 0.15);
+      border-radius: 4px;
+      font-size: 10px;
+      color: rgba(160, 140, 255, 0.5);
+      background: rgba(160, 140, 255, 0.04);
+    }
+
+    /* Stats panel */
+    #stats-panel {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 10;
+      padding: 14px 18px;
+      background: rgba(10, 10, 18, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(160, 140, 255, 0.1);
+      border-radius: 10px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.6s ease 0.4s;
+      min-width: 160px;
+    }
+    #stats-panel.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .stats-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: rgba(160, 140, 255, 0.5);
+      margin-bottom: 10px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 300;
+      color: rgba(200, 195, 230, 0.4);
+    }
+
+    .stat-value {
+      font-size: 13px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: #e0d8ff;
+    }
+
+    .stat-value.fps {
+      font-size: 18px;
+      background: linear-gradient(135deg, #80ffb0, #60d0ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-value.fps.warning {
+      background: linear-gradient(135deg, #ffcc40, #ff8040);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-value.fps.critical {
+      background: linear-gradient(135deg, #ff6060, #ff3030);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-divider {
+      height: 1px;
+      background: rgba(160, 140, 255, 0.08);
+      margin: 8px 0;
+    }
+
+    /* Background gradient orbs */
+    .bg-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: -1;
+    }
+    .bg-orb-1 {
+      width: 500px; height: 500px;
+      top: -150px; right: -100px;
+      background: radial-gradient(circle, rgba(100, 80, 200, 0.08), transparent);
+    }
+    .bg-orb-2 {
+      width: 400px; height: 400px;
+      bottom: -100px; left: -100px;
+      background: radial-gradient(circle, rgba(60, 100, 180, 0.06), transparent);
+    }
+  </style>
+</head>
+<body>
+  <!-- Background ambiance -->
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+
+  <!-- Loading screen -->
+  <div id="loader">
+    <div class="loader-ring"></div>
+    <div class="loader-text">Loading Model</div>
+    <div class="loader-bar"><div class="loader-bar-fill" id="loader-bar-fill"></div></div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-title">Arboreal Library</div>
+    <div class="hud-subtitle">3D Model Viewer</div>
+  </div>
+
+  <!-- Controls hint -->
+  <div id="controls-hint">
+    <div class="hint-item"><span class="hint-key">LMB</span> Orbit</div>
+    <div class="hint-item"><span class="hint-key">RMB</span> Pan</div>
+    <div class="hint-item"><span class="hint-key">Scroll</span> Zoom</div>
+  </div>
+
+  <!-- Stats panel -->
+  <div id="stats-panel">
+    <div class="stats-title">Performance</div>
+    <div class="stat-row">
+      <span class="stat-label">FPS</span>
+      <span class="stat-value fps" id="stat-fps">—</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-row">
+      <span class="stat-label">Triangles</span>
+      <span class="stat-value" id="stat-triangles">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Draw Calls</span>
+      <span class="stat-value" id="stat-calls">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Textures</span>
+      <span class="stat-value" id="stat-textures">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Geometries</span>
+      <span class="stat-value" id="stat-geometries">—</span>
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <div id="canvas-container"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./node_modules/three/build/three.module.js",
+      "three/addons/": "./node_modules/three/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+    // --- Scene ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0f);
+    scene.fog = new THREE.FogExp2(0x0a0a0f, 0.015);
+
+    // --- Camera ---
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(5, 3, 8);
+
+    // --- Renderer ---
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    // --- Controls ---
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 1;
+    controls.maxDistance = 50;
+    controls.maxPolarAngle = Math.PI * 0.85;
+    controls.target.set(0, 1, 0);
+    controls.update();
+
+    // --- Lighting (studio setup) ---
+    // Ambient fill
+    const ambient = new THREE.AmbientLight(0xc8bfff, 0.4);
+    scene.add(ambient);
+
+    // Key light
+    const keyLight = new THREE.DirectionalLight(0xfff5e6, 1.8);
+    keyLight.position.set(5, 8, 4);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 30;
+    keyLight.shadow.camera.left = -10;
+    keyLight.shadow.camera.right = 10;
+    keyLight.shadow.camera.top = 10;
+    keyLight.shadow.camera.bottom = -10;
+    keyLight.shadow.bias = -0.001;
+    scene.add(keyLight);
+
+    // Fill light
+    const fillLight = new THREE.DirectionalLight(0xa0b8ff, 0.6);
+    fillLight.position.set(-4, 3, -2);
+    scene.add(fillLight);
+
+    // Rim / back light
+    const rimLight = new THREE.DirectionalLight(0xd0a0ff, 0.5);
+    rimLight.position.set(-2, 5, -6);
+    scene.add(rimLight);
+
+    // Subtle ground bounce
+    const bounceLight = new THREE.HemisphereLight(0x222244, 0x0a0a0f, 0.3);
+    scene.add(bounceLight);
+
+    // --- Ground plane ---
+    const groundGeo = new THREE.CircleGeometry(30, 64);
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x0d0d14,
+      roughness: 0.9,
+      metalness: 0.0,
+    });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.01;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // --- Grid helper (subtle) ---
+    const grid = new THREE.GridHelper(30, 60, 0x1a1a2e, 0x12121e);
+    grid.material.opacity = 0.15;
+    grid.material.transparent = true;
+    scene.add(grid);
+
+    // --- Load GLB ---
+    const loaderBar = document.getElementById('loader-bar-fill');
+    const loaderEl = document.getElementById('loader');
+    const hudEl = document.getElementById('hud');
+    const hintsEl = document.getElementById('controls-hint');
+    const statsPanel = document.getElementById('stats-panel');
+    const statFps = document.getElementById('stat-fps');
+    const statTriangles = document.getElementById('stat-triangles');
+    const statCalls = document.getElementById('stat-calls');
+    const statTextures = document.getElementById('stat-textures');
+    const statGeometries = document.getElementById('stat-geometries');
+
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(dracoLoader);
+
+    // --- Texture downscaler ---
+    const MAX_TEX_SIZE = 2048;
+    const TEX_PROPS = [
+      'map', 'normalMap', 'roughnessMap', 'metalnessMap',
+      'aoMap', 'emissiveMap', 'bumpMap', 'displacementMap',
+      'alphaMap', 'envMap', 'lightMap'
+    ];
+
+    function downscaleTexture(texture) {
+      const img = texture.image;
+      if (!img || !img.width || !img.height) return;
+      if (img.width <= MAX_TEX_SIZE && img.height <= MAX_TEX_SIZE) return;
+
+      const aspect = img.width / img.height;
+      let newW, newH;
+      if (img.width >= img.height) {
+        newW = MAX_TEX_SIZE;
+        newH = Math.round(MAX_TEX_SIZE / aspect);
+      } else {
+        newH = MAX_TEX_SIZE;
+        newW = Math.round(MAX_TEX_SIZE * aspect);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = newW;
+      canvas.height = newH;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, newW, newH);
+
+      console.log(`↓ Texture ${img.width}×${img.height} → ${newW}×${newH}`);
+      texture.image = canvas;
+      texture.needsUpdate = true;
+    }
+
+    function downscaleAllTextures(model) {
+      const processed = new Set();
+      model.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) {
+          for (const prop of TEX_PROPS) {
+            const tex = mat[prop];
+            if (tex && !processed.has(tex.uuid)) {
+              processed.add(tex.uuid);
+              downscaleTexture(tex);
+            }
+          }
+        }
+      });
+      console.log(`Downscaled ${processed.size} unique textures to max ${MAX_TEX_SIZE}px`);
+    }
+
+    gltfLoader.load(
+      './Meshy_AI_Arboreal_Library_0404050326_texture.glb',
+      (gltf) => {
+        const model = gltf.scene;
+
+        // Downscale textures to 2K before GPU upload
+        downscaleAllTextures(model);
+
+        // Auto-center and scale
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scale = 5 / maxDim;
+
+        model.scale.setScalar(scale);
+        model.position.sub(center.multiplyScalar(scale));
+        model.position.y += (size.y * scale) / 2;
+
+        // Enable shadows
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+
+        scene.add(model);
+
+        // Update camera target
+        const newBox = new THREE.Box3().setFromObject(model);
+        const newCenter = newBox.getCenter(new THREE.Vector3());
+        controls.target.copy(newCenter);
+        controls.update();
+
+        // Position camera to frame the model
+        const fov = camera.fov * (Math.PI / 180);
+        const cameraDistance = (5 / Math.tan(fov / 2)) * 1.4;
+        camera.position.set(
+          newCenter.x + cameraDistance * 0.6,
+          newCenter.y + cameraDistance * 0.35,
+          newCenter.z + cameraDistance * 0.7
+        );
+        controls.update();
+
+        // Hide loader, show HUD
+        loaderEl.classList.add('hidden');
+        setTimeout(() => {
+          hudEl.classList.add('visible');
+          hintsEl.classList.add('visible');
+          statsPanel.classList.add('visible');
+        }, 300);
+      },
+      (progress) => {
+        if (progress.total > 0) {
+          const pct = (progress.loaded / progress.total) * 100;
+          loaderBar.style.width = pct + '%';
+        }
+      },
+      (error) => {
+        console.error('Error loading GLB:', error);
+        document.querySelector('.loader-text').textContent = 'Error loading model';
+        document.querySelector('.loader-ring').style.display = 'none';
+      }
+    );
+
+    // --- Animation loop + FPS counter ---
+    const clock = new THREE.Clock();
+    const fpsHistory = [];
+    const FPS_SAMPLES = 30;
+    let lastStatsUpdate = 0;
+
+    function formatNumber(n) {
+      if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
+      if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+      return n.toString();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      controls.update();
+
+      // Subtle grid rotation
+      grid.rotation.y += 0.0003;
+
+      renderer.render(scene, camera);
+
+      // FPS tracking
+      if (delta > 0) {
+        const fps = 1 / delta;
+        fpsHistory.push(fps);
+        if (fpsHistory.length > FPS_SAMPLES) fpsHistory.shift();
+      }
+
+      // Update stats display ~4 times per second
+      const now = performance.now();
+      if (now - lastStatsUpdate > 250) {
+        lastStatsUpdate = now;
+        const avgFps = fpsHistory.length > 0
+          ? Math.round(fpsHistory.reduce((a, b) => a + b) / fpsHistory.length)
+          : 0;
+
+        statFps.textContent = avgFps;
+        statFps.className = 'stat-value fps' +
+          (avgFps < 20 ? ' critical' : avgFps < 45 ? ' warning' : '');
+
+        const info = renderer.info;
+        statTriangles.textContent = formatNumber(info.render.triangles);
+        statCalls.textContent = info.render.calls;
+        statTextures.textContent = info.memory.textures;
+        statGeometries.textContent = info.memory.geometries;
+      }
+    }
+    animate();
+
+    // --- Resize ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
