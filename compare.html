@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GLB Comparison Benchmark</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #08080d;
+      font-family: 'Inter', sans-serif;
+      color: #e0e0e8;
+      overflow: hidden;
+    }
+    #canvas-container { position: fixed; inset: 0; z-index: 0; }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    #bench-overlay {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    #bench-panel {
+      width: 760px; max-height: 90vh; overflow-y: auto;
+      padding: 28px 32px;
+      background: rgba(10, 10, 18, 0.92);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(160, 140, 255, 0.12);
+      border-radius: 16px;
+      pointer-events: auto;
+    }
+    .bench-title {
+      font-size: 22px; font-weight: 700; margin-bottom: 4px;
+      background: linear-gradient(135deg, #e0d8ff, #a08cff);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .bench-subtitle { font-size: 12px; color: rgba(200,195,230,0.4); margin-bottom: 20px; }
+
+    .progress-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+      text-transform: uppercase; color: rgba(160,140,255,0.5); margin-bottom: 6px;
+    }
+    .progress-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; margin-bottom: 6px; }
+    .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #a08cff, #80ffb0); border-radius: 2px; transition: width 0.3s; }
+    #progress-status { font-size: 13px; color: rgba(200,195,230,0.5); font-family: 'JetBrains Mono', monospace; margin-bottom: 20px; }
+
+    /* Model info cards */
+    .model-cards { display: flex; gap: 12px; margin-bottom: 20px; }
+    .model-card {
+      flex: 1; padding: 14px 16px;
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(160,140,255,0.08);
+      border-radius: 10px;
+    }
+    .model-card-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+      text-transform: uppercase; margin-bottom: 8px;
+    }
+    .model-card-label.a { color: rgba(160, 140, 255, 0.6); }
+    .model-card-label.b { color: rgba(80, 220, 180, 0.6); }
+    .model-stat { display: flex; justify-content: space-between; padding: 2px 0; }
+    .model-stat-key { font-size: 11px; color: rgba(200,195,230,0.4); }
+    .model-stat-val { font-size: 12px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #c8c0e8; }
+
+    /* Results table */
+    #results-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    #results-table th {
+      text-align: left; font-size: 10px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase;
+      color: rgba(160,140,255,0.5); padding: 8px 10px;
+      border-bottom: 1px solid rgba(160,140,255,0.1);
+    }
+    #results-table td {
+      font-size: 13px; padding: 10px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      font-family: 'JetBrains Mono', monospace; color: #c8c0e8;
+    }
+    .config-name { font-family: 'Inter', sans-serif !important; font-weight: 500; }
+    .val-a { color: #b8a8ff; }
+    .val-b { color: #60dcb4; }
+    .winner-cell { font-weight: 700 !important; }
+    .delta { font-size: 11px; }
+    .delta.better { color: #80ffb0; }
+    .delta.worse { color: #ff6060; }
+    .delta.neutral { color: rgba(200,195,230,0.35); }
+
+    #summary-banner {
+      display: none; margin-top: 20px; padding: 16px 20px;
+      background: rgba(80,255,140,0.05); border: 1px solid rgba(80,255,140,0.12);
+      border-radius: 10px;
+    }
+    .summary-label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(80,255,140,0.5); margin-bottom: 6px; }
+    .summary-text { font-size: 14px; color: #e0e0e8; line-height: 1.5; }
+    .summary-text strong { color: #80ffb0; }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div id="bench-overlay">
+    <div id="bench-panel">
+      <div class="bench-title">Model Comparison Benchmark</div>
+      <div class="bench-subtitle">Head-to-head: Original vs meshy2.glb — same camera, same configs</div>
+
+      <div class="progress-label">Progress</div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div id="progress-status">Loading models...</div>
+
+      <div class="model-cards" id="model-cards" style="display:none"></div>
+
+      <table id="results-table" style="display:none">
+        <thead>
+          <tr>
+            <th>Configuration</th>
+            <th>Original (ms)</th>
+            <th>meshy2 (ms)</th>
+            <th>Original FPS</th>
+            <th>meshy2 FPS</th>
+            <th>Difference</th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+
+      <div id="summary-banner">
+        <div class="summary-label">📊 Summary</div>
+        <div class="summary-text" id="summary-text"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "./node_modules/three/build/three.module.js", "three/addons/": "./node_modules/three/examples/jsm/" } }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+    const BENCH_DURATION_MS = 6000;
+    const WARMUP_FRAMES = 30;
+    const TEX_PROPS = ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','bumpMap','displacementMap','alphaMap','envMap','lightMap'];
+
+    const progressFill = document.getElementById('progress-fill');
+    const progressStatus = document.getElementById('progress-status');
+    const resultsBody = document.getElementById('results-body');
+
+    // ===== Scene =====
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0f);
+    const fogInstance = new THREE.FogExp2(0x0a0a0f, 0.015);
+    scene.fog = fogInstance;
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    // Lights
+    const ambient = new THREE.AmbientLight(0xc8bfff, 0.4); scene.add(ambient);
+    const keyLight = new THREE.DirectionalLight(0xfff5e6, 1.8);
+    keyLight.position.set(5, 8, 4); keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 30;
+    keyLight.shadow.camera.left = -10; keyLight.shadow.camera.right = 10;
+    keyLight.shadow.camera.top = 10; keyLight.shadow.camera.bottom = -10;
+    keyLight.shadow.bias = -0.001; scene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(0xa0b8ff, 0.6); fillLight.position.set(-4, 3, -2); scene.add(fillLight);
+    const rimLight = new THREE.DirectionalLight(0xd0a0ff, 0.5); rimLight.position.set(-2, 5, -6); scene.add(rimLight);
+    const bounceLight = new THREE.HemisphereLight(0x222244, 0x0a0a0f, 0.3); scene.add(bounceLight);
+
+    // Ground + Grid
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(30, 64),
+      new THREE.MeshStandardMaterial({ color: 0x0d0d14, roughness: 0.9, metalness: 0 })
+    );
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.01; ground.receiveShadow = true; scene.add(ground);
+    const grid = new THREE.GridHelper(30, 60, 0x1a1a2e, 0x12121e);
+    grid.material.opacity = 0.15; grid.material.transparent = true; scene.add(grid);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ===== Model Loading =====
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(dracoLoader);
+
+    function loadModel(path) {
+      return new Promise((resolve, reject) => {
+        gltfLoader.load(path, (gltf) => {
+          const model = gltf.scene;
+          const box = new THREE.Box3().setFromObject(model);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const scale = 5 / maxDim;
+          model.scale.setScalar(scale);
+          model.position.sub(center.multiplyScalar(scale));
+          model.position.y += (size.y * scale) / 2;
+
+          // Count triangles and textures
+          let triCount = 0;
+          let texSet = new Set();
+          let meshCount = 0;
+          model.traverse((c) => {
+            if (c.isMesh) {
+              meshCount++;
+              const geo = c.geometry;
+              if (geo.index) triCount += geo.index.count / 3;
+              else if (geo.attributes.position) triCount += geo.attributes.position.count / 3;
+              const mats = Array.isArray(c.material) ? c.material : [c.material];
+              for (const mat of mats) {
+                for (const p of TEX_PROPS) { if (mat[p]) texSet.add(mat[p].uuid); }
+              }
+            }
+          });
+
+          resolve({ model, triCount: Math.round(triCount), texCount: texSet.size, meshCount });
+        }, null, reject);
+      });
+    }
+
+    // ===== Texture Helpers =====
+    function downscaleTextures(model, maxSize) {
+      model.traverse((child) => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of mats) {
+          for (const prop of TEX_PROPS) {
+            const tex = mat[prop];
+            if (!tex || !tex.image) continue;
+            const img = tex.image;
+            const w = img.naturalWidth || img.width;
+            const h = img.naturalHeight || img.height;
+            if (w <= maxSize && h <= maxSize) continue;
+            const aspect = w / h;
+            let nw, nh;
+            if (w >= h) { nw = maxSize; nh = Math.round(maxSize / aspect); }
+            else { nh = maxSize; nw = Math.round(maxSize * aspect); }
+            const canvas = document.createElement('canvas');
+            canvas.width = nw; canvas.height = nh;
+            canvas.getContext('2d').drawImage(img, 0, 0, nw, nh);
+            tex.image = canvas; tex.needsUpdate = true;
+          }
+          mat.needsUpdate = true;
+        }
+      });
+    }
+
+    // ===== Benchmark Engine =====
+    function benchmarkRender(durationMs) {
+      return new Promise((resolve) => {
+        const frameTimes = [];
+        let running = true;
+        for (let i = 0; i < WARMUP_FRAMES; i++) renderer.render(scene, camera);
+        renderer.info.reset();
+        const startTime = performance.now();
+        function frame() {
+          if (!running) return;
+          const t0 = performance.now();
+          renderer.render(scene, camera);
+          const t1 = performance.now();
+          frameTimes.push(t1 - t0);
+          if (t1 - startTime >= durationMs) {
+            running = false;
+            const avg = frameTimes.reduce((a, b) => a + b) / frameTimes.length;
+            const sorted = [...frameTimes].sort((a, b) => a - b);
+            resolve({
+              avgMs: avg,
+              minMs: sorted[0],
+              maxMs: sorted[sorted.length - 1],
+              estFps: Math.round(1000 / avg),
+              triangles: renderer.info.render.triangles,
+              calls: renderer.info.render.calls,
+            });
+            return;
+          }
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+      });
+    }
+
+    // ===== Configs to test =====
+    function makeConfigs() {
+      return [
+        {
+          name: 'Baseline (full quality)',
+          apply: (mdl) => {
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            scene.fog = fogInstance;
+            keyLight.castShadow = true;
+            keyLight.shadow.mapSize.set(2048, 2048); keyLight.shadow.map = null;
+            fillLight.visible = true; rimLight.visible = true; bounceLight.visible = true;
+            ground.visible = true; grid.visible = true;
+            mdl.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+          }
+        },
+        {
+          name: 'No Shadows',
+          apply: (mdl) => {
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = false;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            scene.fog = fogInstance;
+            keyLight.castShadow = false;
+            fillLight.visible = true; rimLight.visible = true; bounceLight.visible = true;
+            ground.visible = true; grid.visible = true;
+            mdl.traverse((c) => { if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; } });
+          }
+        },
+        {
+          name: 'Balanced (no shadows, 1x DPR)',
+          apply: (mdl) => {
+            renderer.setPixelRatio(1);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = false;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            scene.fog = fogInstance;
+            keyLight.castShadow = false;
+            fillLight.visible = true; rimLight.visible = true; bounceLight.visible = true;
+            ground.visible = true; grid.visible = true;
+            mdl.traverse((c) => {
+              c.matrixAutoUpdate = false; c.updateMatrix();
+              if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; }
+            });
+          }
+        },
+        {
+          name: 'Full Optimize',
+          apply: (mdl) => {
+            renderer.setPixelRatio(1);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = false;
+            renderer.toneMapping = THREE.NoToneMapping;
+            scene.fog = null;
+            keyLight.castShadow = false;
+            fillLight.visible = false; rimLight.visible = false; bounceLight.visible = false;
+            ground.visible = false; grid.visible = false;
+            mdl.traverse((c) => {
+              c.matrixAutoUpdate = false; c.updateMatrix();
+              if (c.isMesh) { c.castShadow = false; c.receiveShadow = false; }
+            });
+          }
+        },
+      ];
+    }
+
+    // ===== Main =====
+    async function run() {
+      // Load both models
+      progressStatus.textContent = 'Loading original model (79MB)...';
+      const modelA = await loadModel('./Meshy_AI_Arboreal_Library_0404050326_texture.glb');
+      progressStatus.textContent = 'Loading meshy2.glb (24MB)...';
+      const modelB = await loadModel('./meshy2.glb');
+
+      // Downscale textures to 2K on both
+      downscaleTextures(modelA.model, 2048);
+      downscaleTextures(modelB.model, 2048);
+
+      // Show model info cards
+      const cardsEl = document.getElementById('model-cards');
+      cardsEl.style.display = 'flex';
+      function fmtNum(n) { return n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : n; }
+      cardsEl.innerHTML = `
+        <div class="model-card">
+          <div class="model-card-label a">Model A — Original</div>
+          <div class="model-stat"><span class="model-stat-key">File</span><span class="model-stat-val">79 MB</span></div>
+          <div class="model-stat"><span class="model-stat-key">Triangles</span><span class="model-stat-val">${fmtNum(modelA.triCount)}</span></div>
+          <div class="model-stat"><span class="model-stat-key">Meshes</span><span class="model-stat-val">${modelA.meshCount}</span></div>
+          <div class="model-stat"><span class="model-stat-key">Textures</span><span class="model-stat-val">${modelA.texCount}</span></div>
+        </div>
+        <div class="model-card">
+          <div class="model-card-label b">Model B — meshy2.glb</div>
+          <div class="model-stat"><span class="model-stat-key">File</span><span class="model-stat-val">24 MB</span></div>
+          <div class="model-stat"><span class="model-stat-key">Triangles</span><span class="model-stat-val">${fmtNum(modelB.triCount)}</span></div>
+          <div class="model-stat"><span class="model-stat-key">Meshes</span><span class="model-stat-val">${modelB.meshCount}</span></div>
+          <div class="model-stat"><span class="model-stat-key">Textures</span><span class="model-stat-val">${modelB.texCount}</span></div>
+        </div>
+      `;
+
+      document.getElementById('results-table').style.display = 'table';
+      const configs = makeConfigs();
+      const totalTests = configs.length * 2;
+      let testsDone = 0;
+      const resultsA = [];
+      const resultsB = [];
+
+      // Fixed camera
+      function setCameraForModel(mdl) {
+        const box = new THREE.Box3().setFromObject(mdl);
+        const center = box.getCenter(new THREE.Vector3());
+        const fov = camera.fov * (Math.PI / 180);
+        const dist = (5 / Math.tan(fov / 2)) * 1.4;
+        camera.position.set(center.x + dist * 0.6, center.y + dist * 0.35, center.z + dist * 0.7);
+        camera.lookAt(center);
+      }
+
+      for (let i = 0; i < configs.length; i++) {
+        const cfg = configs[i];
+
+        // ---- Test Model A ----
+        progressStatus.textContent = `[${testsDone+1}/${totalTests}] Original — ${cfg.name}`;
+        progressFill.style.width = (testsDone / totalTests * 100) + '%';
+
+        // Swap models: add A, remove B
+        scene.remove(modelB.model);
+        scene.add(modelA.model);
+        cfg.apply(modelA.model);
+        setCameraForModel(modelA.model);
+        renderer.compile(scene, camera);
+
+        const resA = await benchmarkRender(BENCH_DURATION_MS);
+        resultsA.push(resA);
+        testsDone++;
+
+        // ---- Test Model B ----
+        progressStatus.textContent = `[${testsDone+1}/${totalTests}] meshy2 — ${cfg.name}`;
+        progressFill.style.width = (testsDone / totalTests * 100) + '%';
+
+        scene.remove(modelA.model);
+        scene.add(modelB.model);
+        cfg.apply(modelB.model);
+        setCameraForModel(modelB.model);
+        renderer.compile(scene, camera);
+
+        const resB = await benchmarkRender(BENCH_DURATION_MS);
+        resultsB.push(resB);
+        testsDone++;
+
+        // Restore matrixAutoUpdate
+        modelA.model.traverse(c => { c.matrixAutoUpdate = true; });
+        modelB.model.traverse(c => { c.matrixAutoUpdate = true; });
+
+        // Add row
+        const faster = resA.avgMs < resB.avgMs;
+        const pctDiff = ((resB.avgMs - resA.avgMs) / resA.avgMs * 100);
+        const diffLabel = Math.abs(pctDiff) < 3 ? '~same'
+          : (pctDiff > 0 ? `Original ${Math.abs(pctDiff).toFixed(0)}% faster` : `meshy2 ${Math.abs(pctDiff).toFixed(0)}% faster`);
+        const diffClass = Math.abs(pctDiff) < 3 ? 'neutral' : (pctDiff > 0 ? 'better' : 'worse');
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="config-name">${cfg.name}</td>
+          <td class="val-a ${!faster ? '' : 'winner-cell'}">${resA.avgMs.toFixed(2)} ms</td>
+          <td class="val-b ${faster ? '' : 'winner-cell'}">${resB.avgMs.toFixed(2)} ms</td>
+          <td class="val-a">${resA.estFps}</td>
+          <td class="val-b">${resB.estFps}</td>
+          <td><span class="delta ${diffClass}">${diffLabel}</span></td>
+        `;
+        resultsBody.appendChild(tr);
+      }
+
+      // Done
+      progressFill.style.width = '100%';
+      progressStatus.textContent = `Done! Tested ${configs.length} configs × 2 models = ${totalTests} benchmarks.`;
+
+      // Summary
+      const avgA = resultsA.reduce((s, r) => s + r.avgMs, 0) / resultsA.length;
+      const avgB = resultsB.reduce((s, r) => s + r.avgMs, 0) / resultsB.length;
+      const overallPct = ((avgA - avgB) / avgA * 100).toFixed(1);
+      const banner = document.getElementById('summary-banner');
+      banner.style.display = 'block';
+      const triRatio = (modelA.triCount / modelB.triCount).toFixed(1);
+      const sizeRatio = (79 / 24).toFixed(1);
+
+      document.getElementById('summary-text').innerHTML = `
+        <strong>Original:</strong> ${fmtNum(modelA.triCount)} tris, 79MB &nbsp;|&nbsp;
+        <strong>meshy2:</strong> ${fmtNum(modelB.triCount)} tris, 24MB<br>
+        Size reduction: <strong>${sizeRatio}×</strong> smaller file &nbsp;|&nbsp;
+        Tri reduction: <strong>${triRatio}×</strong><br><br>
+        Average frame time: Original <strong>${avgA.toFixed(2)}ms</strong> vs meshy2 <strong>${avgB.toFixed(2)}ms</strong><br>
+        ${avgB < avgA
+          ? `meshy2 is <strong>${Math.abs(overallPct)}% faster</strong> on average across all configs.`
+          : avgA < avgB
+          ? `Original is <strong>${Math.abs(overallPct)}% faster</strong> on average (meshy2 may have more complexity per tri).`
+          : `Both models perform approximately the same.`
+        }
+      `;
+    }
+
+    run().catch(console.error);
+  </script>
+</body>
+</html>

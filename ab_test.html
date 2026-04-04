@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A/B Model Test</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #08080d; font-family: 'Inter', sans-serif; color: #e0e0e8; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; position: fixed; inset: 0; }
+
+    #hud {
+      position: fixed; top: 20px; left: 20px; z-index: 10;
+      padding: 20px 24px;
+      background: rgba(10,10,18,0.88);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(160,140,255,0.1);
+      border-radius: 14px;
+      min-width: 320px;
+    }
+
+    .model-label {
+      font-size: 22px; font-weight: 700; margin-bottom: 2px;
+    }
+    .model-label.a { color: #b8a8ff; }
+    .model-label.b { color: #60dcb4; }
+    .model-sub { font-size: 12px; color: rgba(200,195,230,0.4); margin-bottom: 16px; }
+
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin-bottom: 16px; }
+    .stat-box {}
+    .stat-label { font-size: 9px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(160,140,255,0.4); }
+    .stat-value { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .stat-value.fps { color: #80ffb0; }
+    .stat-value.ms { color: #f0c060; }
+    .stat-value.tris { color: #c8c0e8; }
+    .stat-value.gpu { color: #ff8080; }
+
+    .swap-btn {
+      width: 100%; padding: 10px 16px;
+      background: rgba(160,140,255,0.1);
+      border: 1px solid rgba(160,140,255,0.2);
+      border-radius: 8px;
+      color: #e0e0e8; font-family: 'Inter', sans-serif;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .swap-btn:hover { background: rgba(160,140,255,0.2); border-color: rgba(160,140,255,0.4); }
+
+    .method-note {
+      margin-top: 12px; padding: 10px 12px;
+      background: rgba(255,255,255,0.02);
+      border-radius: 6px;
+      font-size: 11px; color: rgba(200,195,230,0.35);
+      line-height: 1.5;
+    }
+
+    #avg-banner {
+      display: none;
+      margin-top: 12px; padding: 10px 14px;
+      background: rgba(80,255,140,0.04);
+      border: 1px solid rgba(80,255,140,0.1);
+      border-radius: 8px;
+    }
+    .avg-row { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+    .avg-label { color: rgba(200,195,230,0.5); }
+    .avg-val { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #80ffb0; }
+
+    #loading-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      background: #08080d;
+    }
+    .loading-text { font-size: 14px; color: rgba(200,195,230,0.5); }
+  </style>
+</head>
+<body>
+  <div id="loading-overlay"><div class="loading-text" id="loading-msg">Loading models...</div></div>
+
+  <div id="hud">
+    <div class="model-label a" id="model-name">Original (2.26M tris)</div>
+    <div class="model-sub" id="model-file">79 MB · 1 mesh · 3 textures</div>
+
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-label">Actual FPS</div>
+        <div class="stat-value fps" id="fps-val">--</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Frame time</div>
+        <div class="stat-value ms" id="ft-val">--</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Render call (CPU)</div>
+        <div class="stat-value ms" id="rc-val">--</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">GPU time (sync)</div>
+        <div class="stat-value gpu" id="gpu-val">--</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Triangles</div>
+        <div class="stat-value tris" id="tri-val">--</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Draw calls</div>
+        <div class="stat-value tris" id="dc-val">--</div>
+      </div>
+    </div>
+
+    <button class="swap-btn" id="swap-btn" onclick="swapModel()">
+      Press SPACE or click to swap model
+    </button>
+
+    <div id="avg-banner">
+      <div class="avg-row"><span class="avg-label">Avg FPS (last 10s)</span><span class="avg-val" id="avg-fps">--</span></div>
+      <div class="avg-row"><span class="avg-label">Avg GPU time</span><span class="avg-val" id="avg-gpu">--</span></div>
+    </div>
+
+    <div class="method-note">
+      <b>How this works:</b> "Actual FPS" counts real frames per second
+      from requestAnimationFrame (capped at your monitor refresh).
+      "GPU time (sync)" calls gl.finish() every 60 frames to force
+      the GPU to complete all work, giving a true GPU measurement
+      (not just CPU submission time). This is the honest number.
+    </div>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "./node_modules/three/build/three.module.js", "three/addons/": "./node_modules/three/examples/jsm/" } }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+    // Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0f);
+    scene.fog = new THREE.FogExp2(0x0a0a0f, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const gl = renderer.getContext();
+
+    // Lights
+    const ambient = new THREE.AmbientLight(0xc8bfff, 0.4); scene.add(ambient);
+    const keyLight = new THREE.DirectionalLight(0xfff5e6, 1.8);
+    keyLight.position.set(5, 8, 4); keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 30;
+    keyLight.shadow.camera.left = -10; keyLight.shadow.camera.right = 10;
+    keyLight.shadow.camera.top = 10; keyLight.shadow.camera.bottom = -10;
+    keyLight.shadow.bias = -0.001; scene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(0xa0b8ff, 0.6);
+    fillLight.position.set(-4, 3, -2); scene.add(fillLight);
+    const rimLight = new THREE.DirectionalLight(0xd0a0ff, 0.5);
+    rimLight.position.set(-2, 5, -6); scene.add(rimLight);
+    scene.add(new THREE.HemisphereLight(0x222244, 0x0a0a0f, 0.3));
+
+    // Ground
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(30, 64),
+      new THREE.MeshStandardMaterial({ color: 0x0d0d14, roughness: 0.9, metalness: 0 })
+    );
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.01;
+    ground.receiveShadow = true; scene.add(ground);
+    const grid = new THREE.GridHelper(30, 60, 0x1a1a2e, 0x12121e);
+    grid.material.opacity = 0.15; grid.material.transparent = true; scene.add(grid);
+
+    // Controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI / 2.05;
+    controls.minDistance = 1; controls.maxDistance = 40;
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Loaders
+    const draco = new DRACOLoader();
+    draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    const loader = new GLTFLoader(); loader.setDRACOLoader(draco);
+
+    const TEX_PROPS = ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','bumpMap','displacementMap','alphaMap'];
+
+    function prepModel(gltf) {
+      const m = gltf.scene;
+      const box = new THREE.Box3().setFromObject(m);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 5 / maxDim;
+      m.scale.setScalar(scale);
+      m.position.sub(center.multiplyScalar(scale));
+      m.position.y += (size.y * scale) / 2;
+
+      let tris = 0, texSet = new Set(), meshes = 0;
+      m.traverse(c => {
+        if (c.isMesh) {
+          meshes++;
+          c.castShadow = true; c.receiveShadow = true;
+          const g = c.geometry;
+          tris += g.index ? g.index.count / 3 : (g.attributes.position?.count || 0) / 3;
+          const mats = Array.isArray(c.material) ? c.material : [c.material];
+          for (const mat of mats) {
+            for (const p of TEX_PROPS) if (mat[p]) texSet.add(mat[p].uuid);
+            // Downscale textures to 2K
+            for (const p of TEX_PROPS) {
+              const tex = mat[p];
+              if (!tex?.image) continue;
+              const w = tex.image.naturalWidth || tex.image.width;
+              const h = tex.image.naturalHeight || tex.image.height;
+              if (w <= 2048 && h <= 2048) continue;
+              const aspect = w / h;
+              let nw, nh;
+              if (w >= h) { nw = 2048; nh = Math.round(2048 / aspect); }
+              else { nh = 2048; nw = Math.round(2048 * aspect); }
+              const canvas = document.createElement('canvas');
+              canvas.width = nw; canvas.height = nh;
+              canvas.getContext('2d').drawImage(tex.image, 0, 0, nw, nh);
+              tex.image = canvas; tex.needsUpdate = true;
+            }
+          }
+        }
+      });
+      return { model: m, tris: Math.round(tris), texCount: texSet.size, meshCount: meshes };
+    }
+
+    function loadGLB(path) {
+      return new Promise((resolve, reject) => {
+        loader.load(path, gltf => resolve(prepModel(gltf)),
+          p => { if (p.total) document.getElementById('loading-msg').textContent = `Loading ${path}... ${Math.round(p.loaded/p.total*100)}%`; },
+          reject);
+      });
+    }
+
+    // State
+    let models = [];
+    let currentIdx = 0;
+
+    const modelInfo = [
+      { name: 'Original (2.26M tris)', file: '79 MB', labelClass: 'a' },
+      { name: 'meshy2 (200K tris)', file: '24 MB', labelClass: 'b' },
+    ];
+
+    // Stats
+    let frameCount = 0;
+    let lastTime = performance.now();
+    let fpsAccum = 0;
+    let fpsFrames = 0;
+    let renderCallTimes = [];
+    let gpuTimes = [];
+    let avgFpsHistory = [];
+    let avgGpuHistory = [];
+    const GPU_SYNC_INTERVAL = 60; // measure GPU every N frames
+
+    function updateHUD() {
+      const info = modelInfo[currentIdx];
+      const el = document.getElementById('model-name');
+      el.textContent = info.name;
+      el.className = 'model-label ' + info.labelClass;
+      document.getElementById('model-file').textContent =
+        `${info.file} · ${models[currentIdx].meshCount} mesh · ${models[currentIdx].texCount} textures`;
+      document.getElementById('swap-btn').textContent =
+        `Press SPACE to swap → ${modelInfo[1 - currentIdx].name}`;
+    }
+
+    window.swapModel = function() {
+      scene.remove(models[currentIdx].model);
+      currentIdx = 1 - currentIdx;
+      scene.add(models[currentIdx].model);
+      updateHUD();
+
+      // Reset averages
+      avgFpsHistory = [];
+      avgGpuHistory = [];
+      document.getElementById('avg-banner').style.display = 'none';
+    };
+
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space') { e.preventDefault(); swapModel(); }
+    });
+
+    // FPS elements
+    const fpsVal = document.getElementById('fps-val');
+    const ftVal = document.getElementById('ft-val');
+    const rcVal = document.getElementById('rc-val');
+    const gpuVal = document.getElementById('gpu-val');
+    const triVal = document.getElementById('tri-val');
+    const dcVal = document.getElementById('dc-val');
+    const avgFpsEl = document.getElementById('avg-fps');
+    const avgGpuEl = document.getElementById('avg-gpu');
+    const avgBanner = document.getElementById('avg-banner');
+
+    // Animation
+    let prevFrameTime = performance.now();
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+
+      // Real frame-to-frame time
+      const frameDelta = now - prevFrameTime;
+      prevFrameTime = now;
+
+      controls.update();
+
+      // Measure render call (CPU submission time)
+      const t0 = performance.now();
+      renderer.render(scene, camera);
+      const t1 = performance.now();
+      const renderCallMs = t1 - t0;
+      renderCallTimes.push(renderCallMs);
+
+      // Every GPU_SYNC_INTERVAL frames, do a gl.finish() to measure true GPU time
+      frameCount++;
+      if (frameCount % GPU_SYNC_INTERVAL === 0) {
+        const g0 = performance.now();
+        renderer.render(scene, camera);
+        gl.finish(); // blocks until GPU is done
+        const g1 = performance.now();
+        const gpuMs = g1 - g0;
+        gpuTimes.push(gpuMs);
+        gpuVal.textContent = gpuMs.toFixed(2) + ' ms';
+        avgGpuHistory.push(gpuMs);
+      }
+
+      // FPS counter (update every 500ms)
+      fpsAccum++;
+      if (now - lastTime >= 500) {
+        const elapsed = now - lastTime;
+        const fps = Math.round(fpsAccum / (elapsed / 1000));
+        fpsVal.textContent = fps;
+        ftVal.textContent = (elapsed / fpsAccum).toFixed(1) + ' ms';
+
+        const avgRc = renderCallTimes.reduce((a, b) => a + b, 0) / renderCallTimes.length;
+        rcVal.textContent = avgRc.toFixed(2) + ' ms';
+
+        triVal.textContent = renderer.info.render.triangles >= 1e6
+          ? (renderer.info.render.triangles / 1e6).toFixed(2) + 'M'
+          : (renderer.info.render.triangles / 1e3).toFixed(1) + 'K';
+        dcVal.textContent = renderer.info.render.calls;
+
+        avgFpsHistory.push(fps);
+        renderCallTimes = [];
+        lastTime = now;
+        fpsAccum = 0;
+
+        // Show 10-second averages after enough data
+        if (avgFpsHistory.length >= 10) {
+          const last10fps = avgFpsHistory.slice(-20);
+          const last10gpu = avgGpuHistory.slice(-10);
+          avgBanner.style.display = 'block';
+          avgFpsEl.textContent = Math.round(last10fps.reduce((a,b) => a+b) / last10fps.length) + ' fps';
+          if (last10gpu.length > 0) {
+            avgGpuEl.textContent = (last10gpu.reduce((a,b) => a+b) / last10gpu.length).toFixed(2) + ' ms';
+          }
+        }
+      }
+    }
+
+    // Init
+    async function init() {
+      document.getElementById('loading-msg').textContent = 'Loading original model (79MB)...';
+      models.push(await loadGLB('./Meshy_AI_Arboreal_Library_0404050326_texture.glb'));
+
+      document.getElementById('loading-msg').textContent = 'Loading meshy2 (24MB)...';
+      models.push(await loadGLB('./meshy2.glb'));
+
+      // Start with model A
+      scene.add(models[0].model);
+
+      // Position camera
+      const box = new THREE.Box3().setFromObject(models[0].model);
+      const center = box.getCenter(new THREE.Vector3());
+      const fov = camera.fov * (Math.PI / 180);
+      const dist = (5 / Math.tan(fov / 2)) * 1.4;
+      camera.position.set(center.x + dist * 0.6, center.y + dist * 0.35, center.z + dist * 0.7);
+      controls.target.copy(center);
+      controls.update();
+
+      updateHUD();
+      document.getElementById('loading-overlay').style.display = 'none';
+      requestAnimationFrame(animate);
+    }
+
+    init().catch(console.error);
+  </script>
+</body>
+</html>

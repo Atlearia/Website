@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controlled GPU Benchmark</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #08080d; font-family: 'Inter', sans-serif; color: #e0e0e8; overflow: hidden; }
+    #canvas-container { position: fixed; inset: 0; z-index: 0; }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    #overlay {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    #panel {
+      width: 680px; max-height: 90vh; overflow-y: auto;
+      padding: 28px 32px;
+      background: rgba(10,10,18,0.94);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(160,140,255,0.12);
+      border-radius: 16px;
+      pointer-events: auto;
+    }
+    .title {
+      font-size: 20px; font-weight: 700; margin-bottom: 2px;
+      background: linear-gradient(135deg, #e0d8ff, #a08cff);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .subtitle { font-size: 12px; color: rgba(200,195,230,0.35); margin-bottom: 18px; }
+
+    .method-box {
+      padding: 12px 14px; margin-bottom: 18px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(160,140,255,0.06);
+      border-radius: 8px;
+      font-size: 11px; line-height: 1.6; color: rgba(200,195,230,0.4);
+    }
+    .method-box b { color: rgba(200,195,230,0.6); }
+
+    .progress-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+      text-transform: uppercase; color: rgba(160,140,255,0.45); margin-bottom: 6px;
+    }
+    .progress-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; margin-bottom: 6px; }
+    .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #a08cff, #80ffb0); border-radius: 2px; transition: width 0.3s; }
+    #status { font-size: 13px; color: rgba(200,195,230,0.45); font-family: 'JetBrains Mono', monospace; margin-bottom: 20px; }
+
+    /* Live counter */
+    #live-counter {
+      display: none;
+      padding: 14px 16px; margin-bottom: 18px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(160,140,255,0.06);
+      border-radius: 8px;
+    }
+    .live-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .live-stat-label { font-size: 9px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: rgba(160,140,255,0.35); }
+    .live-stat-val { font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .live-stat-val.fps-color { color: #80ffb0; }
+    .live-stat-val.gpu-color { color: #f0c060; }
+    .live-stat-val.frame-color { color: #b8a8ff; }
+
+    /* Results */
+    #results { display: none; }
+    .result-header { font-size: 14px; font-weight: 700; margin: 18px 0 10px; }
+    .result-header.a { color: #b8a8ff; }
+    .result-header.b { color: #60dcb4; }
+
+    .result-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 16px; margin-bottom: 6px; }
+    .rg-label { font-size: 10px; color: rgba(200,195,230,0.35); text-transform: uppercase; letter-spacing: 0.5px; }
+    .rg-val { font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: #c8c0e8; }
+
+    #verdict {
+      display: none;
+      margin-top: 18px; padding: 16px 18px;
+      border-radius: 10px;
+    }
+    #verdict.tie { background: rgba(200,195,230,0.04); border: 1px solid rgba(200,195,230,0.1); }
+    #verdict.a-wins { background: rgba(160,140,255,0.05); border: 1px solid rgba(160,140,255,0.15); }
+    #verdict.b-wins { background: rgba(80,220,180,0.05); border: 1px solid rgba(80,220,180,0.12); }
+    .verdict-label { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(200,195,230,0.4); margin-bottom: 4px; }
+    .verdict-text { font-size: 14px; color: #e0e0e8; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div id="overlay">
+    <div id="panel">
+      <div class="title">Controlled GPU benchmark</div>
+      <div class="subtitle">Fixed camera, gl.finish() sync, no interaction during test</div>
+
+      <div class="method-box">
+        <b>Method:</b> Each model is rendered for 15 seconds at a locked camera position.
+        Every frame calls <b>gl.finish()</b> which forces the CPU to wait until the GPU
+        has finished drawing before measuring the time. This gives a true, GPU-inclusive
+        frame time, not just how fast the CPU can submit commands.<br><br>
+        <b>Controls:</b> Camera and scene are identical for both tests. No orbit controls,
+        no interaction. Both models are pre-loaded and centered before timing starts.
+        First 60 frames are discarded as warmup.
+      </div>
+
+      <div class="progress-label">Progress</div>
+      <div class="progress-bar"><div class="progress-fill" id="pbar"></div></div>
+      <div id="status">Loading models...</div>
+
+      <div id="live-counter">
+        <div class="live-grid">
+          <div>
+            <div class="live-stat-label">Frame</div>
+            <div class="live-stat-val frame-color" id="l-frame">0</div>
+          </div>
+          <div>
+            <div class="live-stat-label">FPS (actual)</div>
+            <div class="live-stat-val fps-color" id="l-fps">--</div>
+          </div>
+          <div>
+            <div class="live-stat-label">GPU frame time</div>
+            <div class="live-stat-val gpu-color" id="l-gpu">--</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="results">
+        <div class="result-header a" id="res-a-name">Original</div>
+        <div class="result-grid">
+          <div><div class="rg-label">Avg GPU time</div><div class="rg-val" id="ra-gpu">--</div></div>
+          <div><div class="rg-label">Actual FPS</div><div class="rg-val" id="ra-fps">--</div></div>
+          <div><div class="rg-label">Min frame</div><div class="rg-val" id="ra-min">--</div></div>
+          <div><div class="rg-label">Max frame</div><div class="rg-val" id="ra-max">--</div></div>
+        </div>
+        <div class="result-grid">
+          <div><div class="rg-label">P50 (median)</div><div class="rg-val" id="ra-p50">--</div></div>
+          <div><div class="rg-label">P95</div><div class="rg-val" id="ra-p95">--</div></div>
+          <div><div class="rg-label">P99</div><div class="rg-val" id="ra-p99">--</div></div>
+          <div><div class="rg-label">Std Dev</div><div class="rg-val" id="ra-std">--</div></div>
+        </div>
+
+        <div class="result-header b" id="res-b-name">meshy2</div>
+        <div class="result-grid">
+          <div><div class="rg-label">Avg GPU time</div><div class="rg-val" id="rb-gpu">--</div></div>
+          <div><div class="rg-label">Actual FPS</div><div class="rg-val" id="rb-fps">--</div></div>
+          <div><div class="rg-label">Min frame</div><div class="rg-val" id="rb-min">--</div></div>
+          <div><div class="rg-label">Max frame</div><div class="rg-val" id="rb-max">--</div></div>
+        </div>
+        <div class="result-grid">
+          <div><div class="rg-label">P50 (median)</div><div class="rg-val" id="rb-p50">--</div></div>
+          <div><div class="rg-label">P95</div><div class="rg-val" id="rb-p95">--</div></div>
+          <div><div class="rg-label">P99</div><div class="rg-val" id="rb-p99">--</div></div>
+          <div><div class="rg-label">Std Dev</div><div class="rg-val" id="rb-std">--</div></div>
+        </div>
+      </div>
+
+      <div id="verdict">
+        <div class="verdict-label">Verdict</div>
+        <div class="verdict-text" id="verdict-text"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "./node_modules/three/build/three.module.js", "three/addons/": "./node_modules/three/examples/jsm/" } }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+    const TEST_SECONDS = 15;
+    const WARMUP_FRAMES = 60;
+    const TEX_PROPS = ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap','bumpMap','displacementMap','alphaMap'];
+
+    // Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0f);
+    scene.fog = new THREE.FogExp2(0x0a0a0f, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    const gl = renderer.getContext();
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0xc8bfff, 0.4));
+    const key = new THREE.DirectionalLight(0xfff5e6, 1.8);
+    key.position.set(5, 8, 4); key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.near = 0.5; key.shadow.camera.far = 30;
+    key.shadow.camera.left = -10; key.shadow.camera.right = 10;
+    key.shadow.camera.top = 10; key.shadow.camera.bottom = -10;
+    key.shadow.bias = -0.001; scene.add(key);
+    const fill = new THREE.DirectionalLight(0xa0b8ff, 0.6); fill.position.set(-4,3,-2); scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xd0a0ff, 0.5); rim.position.set(-2,5,-6); scene.add(rim);
+    scene.add(new THREE.HemisphereLight(0x222244, 0x0a0a0f, 0.3));
+
+    // Ground
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(30, 64),
+      new THREE.MeshStandardMaterial({ color: 0x0d0d14, roughness: 0.9 })
+    );
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.01;
+    ground.receiveShadow = true; scene.add(ground);
+    const grid = new THREE.GridHelper(30, 60, 0x1a1a2e, 0x12121e);
+    grid.material.opacity = 0.15; grid.material.transparent = true; scene.add(grid);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Loader
+    const draco = new DRACOLoader();
+    draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    const loader = new GLTFLoader(); loader.setDRACOLoader(draco);
+
+    function loadGLB(path) {
+      return new Promise((resolve, reject) => {
+        loader.load(path, (gltf) => {
+          const m = gltf.scene;
+          const box = new THREE.Box3().setFromObject(m);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          const scale = 5 / Math.max(size.x, size.y, size.z);
+          m.scale.setScalar(scale);
+          m.position.sub(center.multiplyScalar(scale));
+          m.position.y += (size.y * scale) / 2;
+
+          let tris = 0;
+          m.traverse(c => {
+            if (!c.isMesh) return;
+            c.castShadow = true; c.receiveShadow = true;
+            const g = c.geometry;
+            tris += g.index ? g.index.count / 3 : (g.attributes.position?.count || 0) / 3;
+            const mats = Array.isArray(c.material) ? c.material : [c.material];
+            for (const mat of mats) {
+              for (const p of TEX_PROPS) {
+                const tex = mat[p];
+                if (!tex?.image) continue;
+                const w = tex.image.naturalWidth || tex.image.width;
+                const h = tex.image.naturalHeight || tex.image.height;
+                if (w <= 2048 && h <= 2048) continue;
+                const a = w / h;
+                let nw, nh;
+                if (w >= h) { nw = 2048; nh = Math.round(2048/a); }
+                else { nh = 2048; nw = Math.round(2048*a); }
+                const cv = document.createElement('canvas');
+                cv.width = nw; cv.height = nh;
+                cv.getContext('2d').drawImage(tex.image, 0, 0, nw, nh);
+                tex.image = cv; tex.needsUpdate = true;
+              }
+            }
+          });
+          resolve({ model: m, tris: Math.round(tris) });
+        },
+        p => { if (p.total) document.getElementById('status').textContent = `Loading ${path}... ${Math.round(p.loaded/p.total*100)}%`; },
+        reject);
+      });
+    }
+
+    // Stats helpers
+    function percentile(sorted, p) { return sorted[Math.floor(sorted.length * p)]; }
+    function stddev(arr, avg) {
+      const sum = arr.reduce((s, v) => s + (v - avg) ** 2, 0);
+      return Math.sqrt(sum / arr.length);
+    }
+
+    // Benchmark one model with gl.finish()
+    function benchModel(label, durationSec) {
+      return new Promise((resolve) => {
+        const frameTimes = [];
+        let warmup = WARMUP_FRAMES;
+        let fpsCount = 0;
+        let fpsStart = 0;
+        const totalMs = durationSec * 1000;
+        let benchStart = 0;
+        let started = false;
+
+        const liveCounter = document.getElementById('live-counter');
+        liveCounter.style.display = 'block';
+
+        function tick() {
+          // Render + gl.finish() = true GPU-inclusive time
+          const t0 = performance.now();
+          renderer.render(scene, camera);
+          gl.finish();
+          const t1 = performance.now();
+
+          if (warmup > 0) {
+            warmup--;
+            document.getElementById('l-frame').textContent = `warmup (${warmup})`;
+            requestAnimationFrame(tick);
+            return;
+          }
+
+          if (!started) {
+            benchStart = performance.now();
+            fpsStart = benchStart;
+            started = true;
+          }
+
+          const elapsed = t1 - benchStart;
+          frameTimes.push(t1 - t0);
+          fpsCount++;
+
+          // Live updates
+          document.getElementById('l-frame').textContent = frameTimes.length;
+          document.getElementById('l-gpu').textContent = (t1 - t0).toFixed(2) + ' ms';
+
+          if (performance.now() - fpsStart >= 500) {
+            const fps = Math.round(fpsCount / ((performance.now() - fpsStart) / 1000));
+            document.getElementById('l-fps').textContent = fps;
+            fpsCount = 0;
+            fpsStart = performance.now();
+          }
+
+          // Progress
+          const pct = Math.min(elapsed / totalMs, 1);
+          document.getElementById('pbar').style.width = (pct * 100) + '%';
+          document.getElementById('status').textContent = `Testing ${label}... ${Math.round(pct * 100)}% (${frameTimes.length} frames)`;
+
+          if (elapsed >= totalMs) {
+            liveCounter.style.display = 'none';
+            const sorted = [...frameTimes].sort((a, b) => a - b);
+            const avg = frameTimes.reduce((a, b) => a + b) / frameTimes.length;
+            resolve({
+              avg, min: sorted[0], max: sorted[sorted.length - 1],
+              p50: percentile(sorted, 0.5),
+              p95: percentile(sorted, 0.95),
+              p99: percentile(sorted, 0.99),
+              std: stddev(frameTimes, avg),
+              fps: Math.round(frameTimes.length / (elapsed / 1000)),
+              frames: frameTimes.length,
+            });
+            return;
+          }
+
+          requestAnimationFrame(tick);
+        }
+
+        requestAnimationFrame(tick);
+      });
+    }
+
+    function fmt(ms) { return ms.toFixed(2) + ' ms'; }
+
+    async function run() {
+      const status = document.getElementById('status');
+
+      status.textContent = 'Loading original model (79MB)...';
+      const a = await loadGLB('./Meshy_AI_Arboreal_Library_0404050326_texture.glb');
+      status.textContent = 'Loading meshy2 (24MB)...';
+      const b = await loadGLB('./meshy2.glb');
+
+      // Fixed camera
+      const box = new THREE.Box3().setFromObject(a.model);
+      const center = box.getCenter(new THREE.Vector3());
+      const fov = camera.fov * (Math.PI / 180);
+      const dist = (5 / Math.tan(fov / 2)) * 1.4;
+      camera.position.set(center.x + dist * 0.6, center.y + dist * 0.35, center.z + dist * 0.7);
+      camera.lookAt(center);
+
+      // Pre-compile both
+      scene.add(a.model); renderer.compile(scene, camera); scene.remove(a.model);
+      scene.add(b.model); renderer.compile(scene, camera); scene.remove(b.model);
+
+      // ---- Test A ----
+      scene.add(a.model);
+      document.getElementById('pbar').style.width = '0%';
+      const resA = await benchModel(`Original (${(a.tris/1e6).toFixed(2)}M tris)`, TEST_SECONDS);
+      scene.remove(a.model);
+
+      // ---- Brief pause ----
+      status.textContent = 'Cooldown (2s)...';
+      document.getElementById('pbar').style.width = '0%';
+      await new Promise(r => setTimeout(r, 2000));
+
+      // ---- Test B ----
+      scene.add(b.model);
+      document.getElementById('pbar').style.width = '0%';
+      const resB = await benchModel(`meshy2 (${(b.tris/1e3).toFixed(1)}K tris)`, TEST_SECONDS);
+      scene.remove(b.model);
+
+      // ---- Show results ----
+      document.getElementById('pbar').style.width = '100%';
+      status.textContent = `Done. ${resA.frames + resB.frames} total frames measured over ${TEST_SECONDS * 2}s.`;
+
+      document.getElementById('results').style.display = 'block';
+
+      document.getElementById('res-a-name').textContent = `Original — ${(a.tris/1e6).toFixed(2)}M triangles, 79MB`;
+      document.getElementById('ra-gpu').textContent = fmt(resA.avg);
+      document.getElementById('ra-fps').textContent = resA.fps + ' fps';
+      document.getElementById('ra-min').textContent = fmt(resA.min);
+      document.getElementById('ra-max').textContent = fmt(resA.max);
+      document.getElementById('ra-p50').textContent = fmt(resA.p50);
+      document.getElementById('ra-p95').textContent = fmt(resA.p95);
+      document.getElementById('ra-p99').textContent = fmt(resA.p99);
+      document.getElementById('ra-std').textContent = '±' + fmt(resA.std);
+
+      document.getElementById('res-b-name').textContent = `meshy2 — ${(b.tris/1e3).toFixed(1)}K triangles, 24MB`;
+      document.getElementById('rb-gpu').textContent = fmt(resB.avg);
+      document.getElementById('rb-fps').textContent = resB.fps + ' fps';
+      document.getElementById('rb-min').textContent = fmt(resB.min);
+      document.getElementById('rb-max').textContent = fmt(resB.max);
+      document.getElementById('rb-p50').textContent = fmt(resB.p50);
+      document.getElementById('rb-p95').textContent = fmt(resB.p95);
+      document.getElementById('rb-p99').textContent = fmt(resB.p99);
+      document.getElementById('rb-std').textContent = '±' + fmt(resB.std);
+
+      // Verdict
+      const verdict = document.getElementById('verdict');
+      const vtext = document.getElementById('verdict-text');
+      verdict.style.display = 'block';
+
+      const diff = ((resA.avg - resB.avg) / resA.avg * 100);
+      const absDiff = Math.abs(diff);
+
+      if (absDiff < 5) {
+        verdict.className = 'tie';
+        vtext.innerHTML = `Both models render at effectively the same speed.<br>
+          GPU frame time difference: ${absDiff.toFixed(1)}% (within noise).<br>
+          Original: ${fmt(resA.avg)} avg | meshy2: ${fmt(resB.avg)} avg<br><br>
+          On your GPU, triangle count (${(a.tris/1e6).toFixed(2)}M vs ${(b.tris/1e3).toFixed(0)}K) does not affect
+          render performance. Both are well within your hardware's capability.`;
+      } else if (diff > 0) {
+        verdict.className = 'b-wins';
+        vtext.innerHTML = `meshy2 is ${absDiff.toFixed(1)}% faster on the GPU.<br>
+          Original: ${fmt(resA.avg)} avg | meshy2: ${fmt(resB.avg)} avg<br>
+          That's ${fmt(resA.avg - resB.avg)} saved per frame.`;
+      } else {
+        verdict.className = 'a-wins';
+        vtext.innerHTML = `Original is ${absDiff.toFixed(1)}% faster on the GPU.<br>
+          Original: ${fmt(resA.avg)} avg | meshy2: ${fmt(resB.avg)} avg<br>
+          The 200K model is slightly slower, likely due to material/shader differences.`;
+      }
+    }
+
+    run().catch(console.error);
+  </script>
+</body>
+</html>
