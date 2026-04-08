@@ -1,0 +1,5 @@
+# Large assets (serve locally, don't push to repo)
+Room.glb
+*.glb
+
+node_modules/

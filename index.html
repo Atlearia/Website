@@ -1,21 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GLB Viewer — Arboreal Library</title>
+  <title>Atlearia</title>
+  <meta name="description" content="Atlearia — an immersive 3D room experience">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Cormorant+Garamond:wght@300;400;500&display=swap"
+    rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      background: #0a0a0f;
-      overflow: hidden;
-      font-family: 'Inter', sans-serif;
-      color: #e0e0e8;
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
 
+    :root {
+      --bg-deep: #06060b;
+      --bg-surface: #0c0c14;
+      --accent-primary: #a08cff;
+      --accent-warm: #e8c47c;
+      --accent-glow: rgba(160, 140, 255, 0.12);
+      --text-primary: #e8e4f0;
+      --text-muted: rgba(200, 195, 230, 0.4);
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-deep);
+      font-family: 'Inter', -apple-system, sans-serif;
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Canvas ── */
     #canvas-container {
       position: fixed;
       inset: 0;
@@ -28,281 +54,444 @@
       height: 100%;
     }
 
-    /* Loading overlay */
+    /* ── Loading Screen ── */
     #loader {
       position: fixed;
       inset: 0;
-      z-index: 100;
+      z-index: 1000;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #0a0a0f;
-      transition: opacity 0.8s ease, visibility 0.8s ease;
+      background: var(--bg-deep);
+      transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 1.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
+
     #loader.hidden {
       opacity: 0;
       visibility: hidden;
+      pointer-events: none;
     }
 
-    .loader-ring {
-      width: 56px;
-      height: 56px;
-      border: 3px solid rgba(160, 140, 255, 0.15);
-      border-top-color: #a08cff;
+    /* Particle canvas behind loader content */
+    #particle-canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
+
+    .loader-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    /* Animated sigil / ring */
+    .loader-sigil {
+      width: 80px;
+      height: 80px;
+      position: relative;
+      margin-bottom: 36px;
+    }
+
+    .sigil-ring {
+      position: absolute;
+      inset: 0;
       border-radius: 50%;
-      animation: spin 1s linear infinite;
+      border: 1.5px solid transparent;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
 
-    .loader-text {
-      margin-top: 20px;
-      font-size: 13px;
+    .sigil-ring-outer {
+      border-top-color: var(--accent-primary);
+      border-right-color: rgba(160, 140, 255, 0.3);
+      animation: sigil-spin 3s linear infinite;
+    }
+
+    .sigil-ring-inner {
+      inset: 12px;
+      border-bottom-color: var(--accent-warm);
+      border-left-color: rgba(232, 196, 124, 0.3);
+      animation: sigil-spin 2s linear infinite reverse;
+    }
+
+    .sigil-dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      box-shadow: 0 0 20px var(--accent-primary),
+        0 0 40px rgba(160, 140, 255, 0.3);
+      animation: sigil-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes sigil-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes sigil-pulse {
+
+      0%,
+      100% {
+        opacity: 0.6;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.4);
+      }
+    }
+
+    .loader-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px;
       font-weight: 300;
-      letter-spacing: 2px;
+      letter-spacing: 6px;
       text-transform: uppercase;
-      color: rgba(160, 140, 255, 0.7);
-    }
-
-    .loader-bar {
-      margin-top: 16px;
-      width: 200px;
-      height: 2px;
-      background: rgba(255,255,255,0.06);
-      border-radius: 1px;
-      overflow: hidden;
-    }
-    .loader-bar-fill {
-      width: 0%;
-      height: 100%;
-      background: linear-gradient(90deg, #a08cff, #c8a0ff);
-      border-radius: 1px;
-      transition: width 0.3s ease;
-    }
-
-    /* HUD overlay */
-    #hud {
-      position: fixed;
-      top: 24px;
-      left: 24px;
-      z-index: 10;
+      color: var(--text-primary);
+      margin-bottom: 8px;
       opacity: 0;
-      transform: translateY(8px);
-      transition: all 0.6s ease 0.3s;
-    }
-    #hud.visible {
-      opacity: 1;
-      transform: translateY(0);
+      animation: fade-up 0.8s ease forwards 0.2s;
     }
 
-    .hud-title {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      background: linear-gradient(135deg, #e0d8ff, #a08cff);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .hud-subtitle {
-      margin-top: 4px;
+    .loader-subtitle {
       font-size: 11px;
       font-weight: 300;
-      letter-spacing: 1.5px;
+      letter-spacing: 3px;
       text-transform: uppercase;
-      color: rgba(200, 195, 230, 0.45);
+      color: var(--text-muted);
+      margin-bottom: 40px;
+      opacity: 0;
+      animation: fade-up 0.8s ease forwards 0.5s;
     }
 
-    /* Controls hint */
+    .progress-track {
+      width: 240px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 1px;
+      overflow: hidden;
+      position: relative;
+      opacity: 0;
+      animation: fade-up 0.8s ease forwards 0.7s;
+    }
+
+    .progress-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-warm));
+      border-radius: 1px;
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .progress-glow {
+      position: absolute;
+      top: -4px;
+      right: -2px;
+      width: 20px;
+      height: 9px;
+      background: radial-gradient(ellipse, var(--accent-primary), transparent);
+      filter: blur(3px);
+      opacity: 0.8;
+    }
+
+    .loader-percent {
+      margin-top: 16px;
+      font-size: 12px;
+      font-weight: 400;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 2px;
+      color: rgba(160, 140, 255, 0.6);
+      opacity: 0;
+      animation: fade-up 0.8s ease forwards 0.9s;
+    }
+
+    @keyframes fade-up {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ── Post-load UI ── */
+    .ui-fade {
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+      pointer-events: none;
+    }
+
+    .ui-fade.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
     #controls-hint {
       position: fixed;
-      bottom: 24px;
+      bottom: 28px;
       left: 50%;
-      transform: translateX(-50%) translateY(8px);
+      transform: translateX(-50%);
       z-index: 10;
       display: flex;
-      gap: 20px;
-      opacity: 0;
-      transition: all 0.6s ease 0.5s;
-    }
-    #controls-hint.visible {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
+      gap: 24px;
+      transition-delay: 0.6s;
     }
 
     .hint-item {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       font-size: 11px;
       font-weight: 300;
       letter-spacing: 0.5px;
-      color: rgba(200, 195, 230, 0.35);
+      color: rgba(200, 195, 230, 0.25);
     }
 
     .hint-key {
-      padding: 2px 8px;
-      border: 1px solid rgba(160, 140, 255, 0.15);
+      padding: 3px 8px;
+      border: 1px solid rgba(160, 140, 255, 0.1);
       border-radius: 4px;
       font-size: 10px;
-      color: rgba(160, 140, 255, 0.5);
-      background: rgba(160, 140, 255, 0.04);
+      font-weight: 400;
+      color: rgba(160, 140, 255, 0.4);
+      background: rgba(160, 140, 255, 0.03);
     }
 
-    /* Stats panel */
-    #stats-panel {
+    /* Debug coordinate overlay */
+    #debug-coords {
       position: fixed;
-      top: 24px;
-      right: 24px;
-      z-index: 10;
-      padding: 14px 18px;
-      background: rgba(10, 10, 18, 0.75);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(160, 140, 255, 0.1);
-      border-radius: 10px;
-      opacity: 0;
-      transform: translateY(8px);
-      transition: all 0.6s ease 0.4s;
-      min-width: 160px;
-    }
-    #stats-panel.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .stats-title {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: rgba(160, 140, 255, 0.5);
-      margin-bottom: 10px;
-    }
-
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 3px 0;
-    }
-
-    .stat-label {
-      font-size: 11px;
-      font-weight: 300;
-      color: rgba(200, 195, 230, 0.4);
-    }
-
-    .stat-value {
-      font-size: 13px;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      color: #e0d8ff;
-    }
-
-    .stat-value.fps {
-      font-size: 18px;
-      background: linear-gradient(135deg, #80ffb0, #60d0ff);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .stat-value.fps.warning {
-      background: linear-gradient(135deg, #ffcc40, #ff8040);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .stat-value.fps.critical {
-      background: linear-gradient(135deg, #ff6060, #ff3030);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .stat-divider {
-      height: 1px;
-      background: rgba(160, 140, 255, 0.08);
-      margin: 8px 0;
-    }
-
-    /* Background gradient orbs */
-    .bg-orb {
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(120px);
+      top: 16px;
+      left: 16px;
+      z-index: 50;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(160, 140, 255, 0.2);
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #a0ffa0;
       pointer-events: none;
-      z-index: -1;
+      white-space: pre;
     }
-    .bg-orb-1 {
-      width: 500px; height: 500px;
-      top: -150px; right: -100px;
-      background: radial-gradient(circle, rgba(100, 80, 200, 0.08), transparent);
+
+    #record-btn {
+      position: fixed;
+      top: 16px;
+      left: 340px;
+      z-index: 50;
+      padding: 8px 14px;
+      background: rgba(255, 60, 60, 0.15);
+      border: 1px solid rgba(255, 60, 60, 0.4);
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #ff6060;
+      cursor: pointer;
+      transition: all 0.2s;
     }
-    .bg-orb-2 {
-      width: 400px; height: 400px;
-      bottom: -100px; left: -100px;
-      background: radial-gradient(circle, rgba(60, 100, 180, 0.06), transparent);
+
+    #record-btn:hover {
+      background: rgba(255, 60, 60, 0.3);
+    }
+
+    #record-btn.recording {
+      color: #ff3030;
+      border-color: #ff3030;
+      animation: rec-blink 0.6s ease infinite;
+    }
+
+    @keyframes rec-blink {
+      50% {
+        opacity: 0.4;
+      }
     }
   </style>
 </head>
-<body>
-  <!-- Background ambiance -->
-  <div class="bg-orb bg-orb-1"></div>
-  <div class="bg-orb bg-orb-2"></div>
 
+<body>
   <!-- Loading screen -->
   <div id="loader">
-    <div class="loader-ring"></div>
-    <div class="loader-text">Loading Model</div>
-    <div class="loader-bar"><div class="loader-bar-fill" id="loader-bar-fill"></div></div>
+    <canvas id="particle-canvas"></canvas>
+    <div class="loader-content">
+      <div class="loader-sigil">
+        <div class="sigil-ring sigil-ring-outer"></div>
+        <div class="sigil-ring sigil-ring-inner"></div>
+        <div class="sigil-dot"></div>
+      </div>
+      <div class="loader-title">Atlearia</div>
+      <div class="loader-subtitle">Preparing your space</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill">
+          <div class="progress-glow"></div>
+        </div>
+      </div>
+      <div class="loader-percent" id="loader-percent">0 %</div>
+    </div>
   </div>
 
-  <!-- HUD -->
-  <div id="hud">
-    <div class="hud-title">Arboreal Library</div>
-    <div class="hud-subtitle">3D Model Viewer</div>
-  </div>
+  <!-- Debug coordinate readout -->
+  <div id="debug-coords">cam: loading...</div>
+  <button id="record-btn" onclick="startRecording()">● REC 7s</button>
 
-  <!-- Controls hint -->
-  <div id="controls-hint">
+  <!-- Post-load controls hint -->
+  <div id="controls-hint" class="ui-fade">
     <div class="hint-item"><span class="hint-key">LMB</span> Orbit</div>
     <div class="hint-item"><span class="hint-key">RMB</span> Pan</div>
     <div class="hint-item"><span class="hint-key">Scroll</span> Zoom</div>
   </div>
 
-  <!-- Stats panel -->
-  <div id="stats-panel">
-    <div class="stats-title">Performance</div>
-    <div class="stat-row">
-      <span class="stat-label">FPS</span>
-      <span class="stat-value fps" id="stat-fps">—</span>
-    </div>
-    <div class="stat-divider"></div>
-    <div class="stat-row">
-      <span class="stat-label">Triangles</span>
-      <span class="stat-value" id="stat-triangles">—</span>
-    </div>
-    <div class="stat-row">
-      <span class="stat-label">Draw Calls</span>
-      <span class="stat-value" id="stat-calls">—</span>
-    </div>
-    <div class="stat-row">
-      <span class="stat-label">Textures</span>
-      <span class="stat-value" id="stat-textures">—</span>
-    </div>
-    <div class="stat-row">
-      <span class="stat-label">Geometries</span>
-      <span class="stat-value" id="stat-geometries">—</span>
-    </div>
-  </div>
-
-  <!-- Canvas -->
+  <!-- Three.js canvas mount -->
   <div id="canvas-container"></div>
 
+  <!-- Recording helper -->
+  <script>
+    function startRecording() {
+      const btn = document.getElementById('record-btn');
+      if (window.__recording) return;
+
+      window.__recording = true;
+      window.__recStart = performance.now();
+      window.__recLog = [];
+      btn.classList.add('recording');
+      btn.textContent = '● REC...';
+
+      setTimeout(() => {
+        window.__recording = false;
+        btn.classList.remove('recording');
+        btn.textContent = '● REC 7s';
+        showRecLog(window.__recLog.join('\n'));
+      }, 7000);
+    }
+
+    function showRecLog(text) {
+      // remove old overlay if any
+      const old = document.getElementById('rec-overlay');
+      if (old) old.remove();
+
+      const div = document.createElement('div');
+      div.id = 'rec-overlay';
+      div.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;';
+
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'width:80%;height:60%;background:#111;color:#a0ffa0;border:1px solid #333;border-radius:8px;padding:12px;font:11px/1.4 "Courier New",monospace;resize:none;';
+      ta.readOnly = true;
+
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:12px;';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.textContent = '📋 Copy All';
+      copyBtn.style.cssText = 'padding:8px 20px;background:#2a2a40;color:#a0ffa0;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:13px;';
+      copyBtn.onclick = () => { navigator.clipboard.writeText(text); copyBtn.textContent = '✓ Copied!'; };
+
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '✕ Close';
+      closeBtn.style.cssText = 'padding:8px 20px;background:#2a2a40;color:#ff6060;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:13px;';
+      closeBtn.onclick = () => div.remove();
+
+      btnRow.appendChild(copyBtn);
+      btnRow.appendChild(closeBtn);
+      div.appendChild(ta);
+      div.appendChild(btnRow);
+      document.body.appendChild(div);
+    }
+  </script>
+
+  <!-- ── Loading screen particle animation ── -->
+  <script>
+    (function initParticles() {
+      const canvas = document.getElementById('particle-canvas');
+      const ctx = canvas.getContext('2d');
+      let W, H;
+      const particles = [];
+      const PARTICLE_COUNT = 60;
+
+      function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        particles.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: (Math.random() - 0.5) * 0.3,
+          r: Math.random() * 1.5 + 0.5,
+          alpha: Math.random() * 0.25 + 0.05,
+          pulse: Math.random() * Math.PI * 2,
+        });
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        for (const p of particles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.pulse += 0.01;
+
+          if (p.x < 0) p.x = W;
+          if (p.x > W) p.x = 0;
+          if (p.y < 0) p.y = H;
+          if (p.y > H) p.y = 0;
+
+          const a = p.alpha * (0.6 + 0.4 * Math.sin(p.pulse));
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(160, 140, 255, ${a})`;
+          ctx.fill();
+        }
+
+        // draw faint connection lines between close particles
+        for (let i = 0; i < particles.length; i++) {
+          for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 140) {
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.strokeStyle = `rgba(160, 140, 255, ${0.06 * (1 - dist / 140)})`;
+              ctx.lineWidth = 0.5;
+              ctx.stroke();
+            }
+          }
+        }
+
+        if (!document.getElementById('loader').classList.contains('hidden')) {
+          requestAnimationFrame(draw);
+        }
+      }
+      draw();
+    })();
+  </script>
+
+  <!-- ── Three.js Scene ── -->
   <script type="importmap">
   {
     "imports": {
@@ -318,280 +507,418 @@
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
-    // --- Scene ---
+    // ─── DOM refs ───
+    const loaderEl = document.getElementById('loader');
+    const progressFill = document.getElementById('progress-fill');
+    const percentEl = document.getElementById('loader-percent');
+    const hintsEl = document.getElementById('controls-hint');
+
+    // ─── Scene ───
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0f);
-    scene.fog = new THREE.FogExp2(0x0a0a0f, 0.015);
+    scene.background = new THREE.Color(0x06060b);
 
-    // --- Camera ---
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
-    camera.position.set(5, 3, 8);
+    // ─── Camera (matched to Blender viewport) ───
+    // Blender pivot (-0.7651, 0.3688, 1.7046) → Three.js target: (-0.7651, 1.7046, -0.3688)
+    // Blender cam pos via quaternion+distance → Three.js: (13.96, 9.72, 6.14)
+    // Blender viewport uses 50mm lens on 36mm sensor → ~28° vertical FOV
+    const camera = new THREE.PerspectiveCamera(
+      28,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      500
+    );
 
-    // --- Renderer ---
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // final positions — picked from live debug overlay
+    const TARGET_CAM_POS = new THREE.Vector3(0.857, 3.925, 4.559);
+    const TARGET_LOOK_AT = new THREE.Vector3(-0.131, 0.081, 0.738);
+
+    // start camera slightly further out for a cinematic dolly-in
+    camera.position.copy(TARGET_CAM_POS).multiplyScalar(1.15);
+
+    // ─── Renderer ───
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.6;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-    // --- Controls ---
+    // ─── Controls ───
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
-    controls.minDistance = 1;
-    controls.maxDistance = 50;
-    controls.maxPolarAngle = Math.PI * 0.85;
-    controls.target.set(0, 1, 0);
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 2;
+    controls.maxDistance = 40;
+    controls.maxPolarAngle = Math.PI * 0.88;
+    controls.target.copy(TARGET_LOOK_AT);
+    controls.enabled = false;           // disabled during intro animation
     controls.update();
 
-    // --- Lighting (studio setup) ---
-    // Ambient fill
-    const ambient = new THREE.AmbientLight(0xc8bfff, 0.4);
-    scene.add(ambient);
+    // ─── Lighting ───
+    const USE_CUSTOM_LIGHTS = false; // true = added studio lights, false = Blender export only
+    const GLB_LIGHT_INTENSITY = 0.0005;  // multiplier for Blender-exported lights
+    const GLB_LIGHT_TINT = 0xFF8C00;      // warm yellow tint color
+    const GLB_LIGHT_TINT_STRENGTH = 0.5; // 0 = no tint, 1 = fully replace with tint color
 
-    // Key light
-    const keyLight = new THREE.DirectionalLight(0xfff5e6, 1.8);
-    keyLight.position.set(5, 8, 4);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 2048;
-    keyLight.shadow.mapSize.height = 2048;
-    keyLight.shadow.camera.near = 0.5;
-    keyLight.shadow.camera.far = 30;
-    keyLight.shadow.camera.left = -10;
-    keyLight.shadow.camera.right = 10;
-    keyLight.shadow.camera.top = 10;
-    keyLight.shadow.camera.bottom = -10;
-    keyLight.shadow.bias = -0.001;
-    scene.add(keyLight);
+    if (USE_CUSTOM_LIGHTS) {
+      // ambient fill
+      const ambient = new THREE.AmbientLight(0xd0c8ff, 0.6);
+      scene.add(ambient);
 
-    // Fill light
-    const fillLight = new THREE.DirectionalLight(0xa0b8ff, 0.6);
-    fillLight.position.set(-4, 3, -2);
-    scene.add(fillLight);
+      // key light (warm daylight)
+      const keyLight = new THREE.DirectionalLight(0xfff4e0, 2.2);
+      keyLight.position.set(6, 10, 5);
+      keyLight.castShadow = true;
+      keyLight.shadow.mapSize.set(2048, 2048);
+      keyLight.shadow.camera.near = 0.5;
+      keyLight.shadow.camera.far = 40;
+      keyLight.shadow.camera.left = -15;
+      keyLight.shadow.camera.right = 15;
+      keyLight.shadow.camera.top = 15;
+      keyLight.shadow.camera.bottom = -15;
+      keyLight.shadow.bias = -0.0005;
+      scene.add(keyLight);
 
-    // Rim / back light
-    const rimLight = new THREE.DirectionalLight(0xd0a0ff, 0.5);
-    rimLight.position.set(-2, 5, -6);
-    scene.add(rimLight);
+      // fill (cool blue)
+      const fillLight = new THREE.DirectionalLight(0x9ab8e0, 0.8);
+      fillLight.position.set(-5, 4, -3);
+      scene.add(fillLight);
 
-    // Subtle ground bounce
-    const bounceLight = new THREE.HemisphereLight(0x222244, 0x0a0a0f, 0.3);
-    scene.add(bounceLight);
+      // rim / back accent
+      const rimLight = new THREE.DirectionalLight(0xc8a0ff, 0.4);
+      rimLight.position.set(-3, 6, -8);
+      scene.add(rimLight);
 
-    // --- Ground plane ---
-    const groundGeo = new THREE.CircleGeometry(30, 64);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x0d0d14,
-      roughness: 0.9,
-      metalness: 0.0,
+      // hemisphere for ground bounce
+      const hemi = new THREE.HemisphereLight(0x2a2840, 0x0a0a10, 0.5);
+      scene.add(hemi);
+    }
+
+    // ─── Fireflies ───
+    const FIREFLY_COUNT = 400;
+    const FIREFLY_SPREAD = 5;       // radius of spawn area
+    const FIREFLY_HEIGHT_MIN = 0.2;
+    const FIREFLY_HEIGHT_MAX = 3.5;
+
+    // soft radial glow sprite
+    const ffCanvas = document.createElement('canvas');
+    ffCanvas.width = 32; ffCanvas.height = 32;
+    const ffCtx = ffCanvas.getContext('2d');
+    const grad = ffCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grad.addColorStop(0, 'rgba(255, 210, 80, 1.0)');
+    grad.addColorStop(0.3, 'rgba(255, 190, 50, 0.6)');
+    grad.addColorStop(1, 'rgba(255, 160, 20, 0.0)');
+    ffCtx.fillStyle = grad;
+    ffCtx.fillRect(0, 0, 32, 32);
+    const ffTexture = new THREE.CanvasTexture(ffCanvas);
+
+    // geometry — randomized positions + per-particle data
+    const ffPositions = new Float32Array(FIREFLY_COUNT * 3);
+    const ffPhases = new Float32Array(FIREFLY_COUNT);     // random phase offset
+    const ffSpeeds = new Float32Array(FIREFLY_COUNT);     // drift speed
+    const ffBaseY = new Float32Array(FIREFLY_COUNT);      // base height
+    const ffRadii = new Float32Array(FIREFLY_COUNT);      // orbit radius
+
+    for (let i = 0; i < FIREFLY_COUNT; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * FIREFLY_SPREAD;
+      ffPositions[i * 3] = Math.cos(angle) * r;
+      ffPositions[i * 3 + 1] = FIREFLY_HEIGHT_MIN + Math.random() * (FIREFLY_HEIGHT_MAX - FIREFLY_HEIGHT_MIN);
+      ffPositions[i * 3 + 2] = Math.sin(angle) * r;
+      ffPhases[i] = Math.random() * Math.PI * 2;
+      ffSpeeds[i] = 0.3 + Math.random() * 0.7;
+      ffBaseY[i] = ffPositions[i * 3 + 1];
+      ffRadii[i] = 0.15 + Math.random() * 0.4;
+    }
+
+    const ffGeo = new THREE.BufferGeometry();
+    ffGeo.setAttribute('position', new THREE.BufferAttribute(ffPositions, 3));
+
+    const ffMat = new THREE.PointsMaterial({
+      map: ffTexture,
+      size: 0.12,
+      transparent: true,
+      opacity: 0.7,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
     });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.01;
-    ground.receiveShadow = true;
-    scene.add(ground);
 
-    // --- Grid helper (subtle) ---
-    const grid = new THREE.GridHelper(30, 60, 0x1a1a2e, 0x12121e);
-    grid.material.opacity = 0.15;
-    grid.material.transparent = true;
-    scene.add(grid);
+    const fireflies = new THREE.Points(ffGeo, ffMat);
+    scene.add(fireflies);
 
-    // --- Load GLB ---
-    const loaderBar = document.getElementById('loader-bar-fill');
-    const loaderEl = document.getElementById('loader');
-    const hudEl = document.getElementById('hud');
-    const hintsEl = document.getElementById('controls-hint');
-    const statsPanel = document.getElementById('stats-panel');
-    const statFps = document.getElementById('stat-fps');
-    const statTriangles = document.getElementById('stat-triangles');
-    const statCalls = document.getElementById('stat-calls');
-    const statTextures = document.getElementById('stat-textures');
-    const statGeometries = document.getElementById('stat-geometries');
+    // animate fireflies each frame
+    function updateFireflies(elapsed) {
+      const pos = ffGeo.attributes.position.array;
+      for (let i = 0; i < FIREFLY_COUNT; i++) {
+        const phase = ffPhases[i];
+        const speed = ffSpeeds[i];
+        const t = elapsed * speed + phase;
+        // gentle drift
+        pos[i * 3] += Math.sin(t * 0.8) * 0.002;
+        pos[i * 3 + 1] = ffBaseY[i] + Math.sin(t * 0.5) * 0.3;
+        pos[i * 3 + 2] += Math.cos(t * 0.6) * 0.002;
+      }
+      ffGeo.attributes.position.needsUpdate = true;
+      // subtle global flicker
+      ffMat.opacity = 0.5 + Math.sin(elapsed * 1.5) * 0.2;
+    }
 
+    // ─── Texture downscaler (keep VRAM tame for 134 MB model) ───
+    const MAX_TEX = 2048;
+    const TEX_KEYS = [
+      'map', 'normalMap', 'roughnessMap', 'metalnessMap',
+      'aoMap', 'emissiveMap', 'bumpMap', 'alphaMap', 'lightMap'
+    ];
+
+    function shrinkTexture(tex) {
+      const img = tex.image;
+      if (!img || !img.width || !img.height) return;
+      if (img.width <= MAX_TEX && img.height <= MAX_TEX) return;
+
+      const ratio = img.width / img.height;
+      let w, h;
+      if (img.width >= img.height) { w = MAX_TEX; h = Math.round(MAX_TEX / ratio); }
+      else { h = MAX_TEX; w = Math.round(MAX_TEX * ratio); }
+
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      tex.image = c;
+      tex.needsUpdate = true;
+    }
+
+    function shrinkAllTextures(root) {
+      const seen = new Set();
+      root.traverse(child => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const m of mats) {
+          for (const k of TEX_KEYS) {
+            const t = m[k];
+            if (t && !seen.has(t.uuid)) { seen.add(t.uuid); shrinkTexture(t); }
+          }
+        }
+      });
+    }
+
+    // ─── Load Room.glb ───
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
 
     const gltfLoader = new GLTFLoader();
     gltfLoader.setDRACOLoader(dracoLoader);
 
-    // --- Texture downscaler ---
-    const MAX_TEX_SIZE = 2048;
-    const TEX_PROPS = [
-      'map', 'normalMap', 'roughnessMap', 'metalnessMap',
-      'aoMap', 'emissiveMap', 'bumpMap', 'displacementMap',
-      'alphaMap', 'envMap', 'lightMap'
-    ];
-
-    function downscaleTexture(texture) {
-      const img = texture.image;
-      if (!img || !img.width || !img.height) return;
-      if (img.width <= MAX_TEX_SIZE && img.height <= MAX_TEX_SIZE) return;
-
-      const aspect = img.width / img.height;
-      let newW, newH;
-      if (img.width >= img.height) {
-        newW = MAX_TEX_SIZE;
-        newH = Math.round(MAX_TEX_SIZE / aspect);
-      } else {
-        newH = MAX_TEX_SIZE;
-        newW = Math.round(MAX_TEX_SIZE * aspect);
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = newW;
-      canvas.height = newH;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, newW, newH);
-
-      console.log(`↓ Texture ${img.width}×${img.height} → ${newW}×${newH}`);
-      texture.image = canvas;
-      texture.needsUpdate = true;
-    }
-
-    function downscaleAllTextures(model) {
-      const processed = new Set();
-      model.traverse((child) => {
-        if (!child.isMesh || !child.material) return;
-        const mats = Array.isArray(child.material) ? child.material : [child.material];
-        for (const mat of mats) {
-          for (const prop of TEX_PROPS) {
-            const tex = mat[prop];
-            if (tex && !processed.has(tex.uuid)) {
-              processed.add(tex.uuid);
-              downscaleTexture(tex);
-            }
-          }
-        }
-      });
-      console.log(`Downscaled ${processed.size} unique textures to max ${MAX_TEX_SIZE}px`);
-    }
-
     gltfLoader.load(
-      './Meshy_AI_Arboreal_Library_0404050326_texture.glb',
+      './Room.glb',
       (gltf) => {
         const model = gltf.scene;
 
-        // Downscale textures to 2K before GPU upload
-        downscaleAllTextures(model);
+        // downscale oversized textures
+        shrinkAllTextures(model);
 
-        // Auto-center and scale
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const scale = 5 / maxDim;
-
-        model.scale.setScalar(scale);
-        model.position.sub(center.multiplyScalar(scale));
-        model.position.y += (size.y * scale) / 2;
-
-        // Enable shadows
-        model.traverse((child) => {
+        // enable shadows on every mesh + scale exported lights
+        model.traverse(child => {
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
+          }
+          if (child.isLight) {
+            child.intensity *= GLB_LIGHT_INTENSITY;
+            child.color.lerp(new THREE.Color(GLB_LIGHT_TINT), GLB_LIGHT_TINT_STRENGTH);
           }
         });
 
         scene.add(model);
 
-        // Update camera target
-        const newBox = new THREE.Box3().setFromObject(model);
-        const newCenter = newBox.getCenter(new THREE.Vector3());
-        controls.target.copy(newCenter);
-        controls.update();
 
-        // Position camera to frame the model
-        const fov = camera.fov * (Math.PI / 180);
-        const cameraDistance = (5 / Math.tan(fov / 2)) * 1.4;
-        camera.position.set(
-          newCenter.x + cameraDistance * 0.6,
-          newCenter.y + cameraDistance * 0.35,
-          newCenter.z + cameraDistance * 0.7
-        );
-        controls.update();
 
-        // Hide loader, show HUD
-        loaderEl.classList.add('hidden');
+        // reveal
+        progressFill.style.width = '100%';
+        percentEl.textContent = '100 %';
+
         setTimeout(() => {
-          hudEl.classList.add('visible');
-          hintsEl.classList.add('visible');
-          statsPanel.classList.add('visible');
-        }, 300);
+          loaderEl.classList.add('hidden');
+          beginIntroAnimation();
+        }, 600);
       },
       (progress) => {
         if (progress.total > 0) {
-          const pct = (progress.loaded / progress.total) * 100;
-          loaderBar.style.width = pct + '%';
+          const pct = Math.min((progress.loaded / progress.total) * 100, 99);
+          progressFill.style.width = pct + '%';
+          percentEl.textContent = Math.round(pct) + ' %';
         }
       },
-      (error) => {
-        console.error('Error loading GLB:', error);
-        document.querySelector('.loader-text').textContent = 'Error loading model';
-        document.querySelector('.loader-ring').style.display = 'none';
+      (err) => {
+        console.error('GLB load error:', err);
+        percentEl.textContent = 'Load failed';
+        document.querySelector('.loader-sigil').style.display = 'none';
       }
     );
 
-    // --- Animation loop + FPS counter ---
-    const clock = new THREE.Clock();
-    const fpsHistory = [];
-    const FPS_SAMPLES = 30;
-    let lastStatsUpdate = 0;
+    // ─── Intro camera dolly ───
+    let introActive = false;
+    let introT = 0;
+    const INTRO_DURATION = 2.4; // seconds
 
-    function formatNumber(n) {
-      if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
-      if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
-      return n.toString();
+    function beginIntroAnimation() {
+      introActive = true;
+      introT = 0;
+
+      // after intro dolly, show hints and arm the click-sweep
+      setTimeout(() => {
+        hintsEl.classList.add('visible');
+        attachSweepListener();
+      }, INTRO_DURATION * 1000 + 400);
     }
+
+    // smooth ease
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+    // starting camera position (slightly pulled back)
+    const INTRO_START = TARGET_CAM_POS.clone().multiplyScalar(1.15);
+
+    // ─── Click-triggered cinematic sweep ───
+    const SWEEP_CAM_POS = new THREE.Vector3(-0.037, 2.121, 1.028);
+    const SWEEP_TARGET = new THREE.Vector3(-0.037, 0.121, 1.028);
+    const SWEEP_DURATION = 3.0; // seconds
+
+    let sweepActive = false;
+    let sweepT = 0;
+    let sweepStartPos = new THREE.Vector3();
+    let sweepStartTarget = new THREE.Vector3();
+    let sweepTriggered = false;
+
+    // smooth S-curve for professional feel
+    function easeInOutQuart(t) {
+      return t < 0.5
+        ? 8 * t * t * t * t
+        : 1 - Math.pow(-2 * t + 2, 4) / 2;
+    }
+
+    function beginSweep() {
+      if (sweepTriggered) return;
+      sweepTriggered = true;
+
+      // capture where we currently are
+      sweepStartPos.copy(camera.position);
+      sweepStartTarget.copy(controls.target);
+
+      sweepActive = true;
+      sweepT = 0;
+      controls.enabled = false;
+    }
+
+    // listen for first click/touch/key after model loaded
+    function attachSweepListener() {
+      const trigger = () => {
+        beginSweep();
+        window.removeEventListener('click', trigger);
+        window.removeEventListener('touchstart', trigger);
+        window.removeEventListener('keydown', trigger);
+      };
+      window.addEventListener('click', trigger, { once: true });
+      window.addEventListener('touchstart', trigger, { once: true });
+      window.addEventListener('keydown', trigger, { once: true });
+    }
+
+    // ─── Render loop ───
+    const clock = new THREE.Clock();
 
     function animate() {
       requestAnimationFrame(animate);
       const delta = clock.getDelta();
-      controls.update();
 
-      // Subtle grid rotation
-      grid.rotation.y += 0.0003;
+      // phase 1: intro dolly (load → spawn)
+      if (introActive) {
+        introT += delta / INTRO_DURATION;
+        if (introT >= 1) {
+          introT = 1;
+          introActive = false;
+          controls.enabled = true;
+        }
+        const t = easeOutCubic(Math.min(introT, 1));
+        camera.position.lerpVectors(INTRO_START, TARGET_CAM_POS, t);
+        camera.lookAt(TARGET_LOOK_AT);
+        controls.target.copy(TARGET_LOOK_AT);
+      }
+
+      // phase 2: click-triggered cinematic sweep
+      if (sweepActive) {
+        sweepT += delta / SWEEP_DURATION;
+        const t = easeInOutQuart(Math.min(sweepT, 1));
+        camera.position.lerpVectors(sweepStartPos, SWEEP_CAM_POS, t);
+        controls.target.lerpVectors(sweepStartTarget, SWEEP_TARGET, t);
+        camera.lookAt(controls.target);
+        // zero-out roll gradually so handoff to OrbitControls (which has 0 roll) is seamless
+        camera.rotation.z *= (1 - t);
+
+        if (sweepT >= 1) {
+          sweepActive = false;
+          // lock final position before re-enabling controls
+          camera.position.copy(SWEEP_CAM_POS);
+          controls.target.copy(SWEEP_TARGET);
+          camera.lookAt(SWEEP_TARGET);
+          controls.update();
+          controls.enabled = true;
+        }
+      }
+
+      // only let OrbitControls touch the camera when no animation is running
+      if (!introActive && !sweepActive) {
+        controls.update();
+      }
+
+      // animate fireflies
+      updateFireflies(clock.elapsedTime);
 
       renderer.render(scene, camera);
 
-      // FPS tracking
-      if (delta > 0) {
-        const fps = 1 / delta;
-        fpsHistory.push(fps);
-        if (fpsHistory.length > FPS_SAMPLES) fpsHistory.shift();
-      }
+      // live debug coords
+      const cp = camera.position;
+      const ct = controls.target;
+      const rot = camera.rotation;
+      const toDeg = THREE.MathUtils.radToDeg;
+      document.getElementById('debug-coords').textContent =
+        `cam pos:  (${cp.x.toFixed(3)}, ${cp.y.toFixed(3)}, ${cp.z.toFixed(3)})\n` +
+        `target:   (${ct.x.toFixed(3)}, ${ct.y.toFixed(3)}, ${ct.z.toFixed(3)})\n` +
+        `rot:      (${toDeg(rot.x).toFixed(1)}°, ${toDeg(rot.y).toFixed(1)}°, ${toDeg(rot.z).toFixed(1)}°)`;
 
-      // Update stats display ~4 times per second
-      const now = performance.now();
-      if (now - lastStatsUpdate > 250) {
-        lastStatsUpdate = now;
-        const avgFps = fpsHistory.length > 0
-          ? Math.round(fpsHistory.reduce((a, b) => a + b) / fpsHistory.length)
-          : 0;
-
-        statFps.textContent = avgFps;
-        statFps.className = 'stat-value fps' +
-          (avgFps < 20 ? ' critical' : avgFps < 45 ? ' warning' : '');
-
-        const info = renderer.info;
-        statTriangles.textContent = formatNumber(info.render.triangles);
-        statCalls.textContent = info.render.calls;
-        statTextures.textContent = info.memory.textures;
-        statGeometries.textContent = info.memory.geometries;
+      // recording
+      if (window.__recording) {
+        const ms = (performance.now() - window.__recStart).toFixed(1);
+        window.__recLog.push(
+          `${ms}ms | pos(${cp.x.toFixed(4)}, ${cp.y.toFixed(4)}, ${cp.z.toFixed(4)}) ` +
+          `tgt(${ct.x.toFixed(4)}, ${ct.y.toFixed(4)}, ${ct.z.toFixed(4)}) ` +
+          `rot(${toDeg(rot.x).toFixed(2)}°, ${toDeg(rot.y).toFixed(2)}°, ${toDeg(rot.z).toFixed(2)}°) ` +
+          `intro=${introActive} sweep=${sweepActive} sweepT=${sweepT.toFixed(4)}`
+        );
       }
     }
     animate();
 
-    // --- Resize ---
+    // ─── Resize ───
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
+
+    // ─── Context loss safety ───
+    renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('WebGL context lost');
+    });
+    renderer.domElement.addEventListener('webglcontextrestored', () => {
+      console.log('WebGL context restored');
+    });
   </script>
 </body>
+
 </html>
