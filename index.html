@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Atlearia</title>
+  <title></title>
   <meta name="description" content="Atlearia — an immersive 3D room experience">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -278,9 +278,12 @@
 
     /* Debug coordinate overlay */
     /* ── Dev Tools (hidden by default) ── */
-    #debug-coords, #record-btn, #controls-hint {
+    #debug-coords,
+    #record-btn,
+    #controls-hint {
       display: none;
     }
+
     body.dev-mode #debug-coords,
     body.dev-mode #record-btn {
       display: block;
@@ -354,6 +357,7 @@
       pointer-events: none;
       z-index: 100;
     }
+
     #coming-soon.visible {
       opacity: 1;
       visibility: visible;
@@ -371,8 +375,7 @@
         <div class="sigil-ring sigil-ring-inner"></div>
         <div class="sigil-dot"></div>
       </div>
-      <div class="loader-title">Atlearia</div>
-      <div class="loader-subtitle">Preparing your space</div>
+      <div class="loader-title">ningye.ca</div>
       <div class="progress-track">
         <div class="progress-fill" id="progress-fill">
           <div class="progress-glow"></div>
@@ -807,10 +810,14 @@
       introActive = true;
       introT = 0;
 
-      // after intro dolly, show hints and arm the click-sweep
+      // allow clicking to skip straight into the cinematic sweep
+      attachSweepListener();
+
+      // after intro dolly, show hints (if they haven't bypassed it yet)
       setTimeout(() => {
-        hintsEl.classList.add('visible');
-        attachSweepListener();
+        if (!sweepActive && !window.__fireBurnActive) {
+          hintsEl.classList.add('visible');
+        }
       }, INTRO_DURATION * 1000 + 400);
     }
 
@@ -820,7 +827,7 @@
     if (window.__devMode) {
       document.body.classList.add('dev-mode');
     }
-    
+
     let konamiBuffer = '';
     const konamiSequence = 'atlearia';
 
