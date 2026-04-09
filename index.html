@@ -74,7 +74,7 @@
       pointer-events: none;
     }
 
-    /* Particle canvas behind loader content */
+    /* background particles for loader */
     #particle-canvas {
       position: absolute;
       inset: 0;
@@ -90,7 +90,7 @@
       gap: 0;
     }
 
-    /* Animated sigil / ring */
+    /* drawing the spinning rings */
     .loader-sigil {
       width: 80px;
       height: 80px;
@@ -231,7 +231,7 @@
       }
     }
 
-    /* ── Post-load UI ── */
+    /* hints UI */
     .ui-fade {
       opacity: 0;
       transform: translateY(6px);
@@ -276,8 +276,8 @@
       background: rgba(160, 140, 255, 0.03);
     }
 
-    /* Debug coordinate overlay */
-    /* ── Dev Tools (hidden by default) ── */
+    /* debug stuff */
+    /* devmode tools, hidden unless u enter konami code */
     #debug-coords,
     #record-btn,
     #controls-hint {
@@ -338,7 +338,7 @@
       }
     }
 
-    /* ── Book Overlay ── */
+    /* coming soon text over the book */
     #coming-soon {
       position: absolute;
       top: 50%;
@@ -399,10 +399,16 @@
   <!-- Book writing overlay -->
   <div id="coming-soon">Coming soon...</div>
 
-  <!-- Three.js canvas mount -->
+  <!-- why are you stalking my code? -->
+  <!-- i mean, i guess it's flattering -->
+  <!-- do you think humans control fire because they got smarter, or did cooking food make them smarter -->
+  <!-- slightly smarter ape stumbles onto fire, eats better, has a smarter kid, that kid uses fire more cleverly, and so on in a loop -->
+  <!-- but then again, other animals have encountered fire and never ran with it, so maybe there was already something different about early humans before the cooking even started -->
+  <!-- what if intelligence was never the gift we thought it was, but simply fire's way of finding a more efficient way to spread? -->
+
   <div id="canvas-container"></div>
 
-  <!-- Recording helper -->
+  <!-- dirty script to grab cam coords for debugging -->
   <script>
     function startRecording() {
       const btn = document.getElementById('record-btn');
@@ -423,7 +429,7 @@
     }
 
     function showRecLog(text) {
-      // remove old overlay if any
+      // nuke old overlay first
       const old = document.getElementById('rec-overlay');
       if (old) old.remove();
 
@@ -457,7 +463,7 @@
     }
   </script>
 
-  <!-- ── Loading screen particle animation ── -->
+  <!-- particle system for loader, drawn on 2d context bc webgl takes too long to init -->
   <script>
     (function initParticles() {
       const canvas = document.getElementById('particle-canvas');
@@ -505,7 +511,7 @@
           ctx.fill();
         }
 
-        // draw faint connection lines between close particles
+        // connects particles together if they get close enough, looks cool
         for (let i = 0; i < particles.length; i++) {
           for (let j = i + 1; j < particles.length; j++) {
             const dx = particles[i].x - particles[j].x;
@@ -530,7 +536,7 @@
     })();
   </script>
 
-  <!-- ── Three.js Scene ── -->
+  <!-- main 3d stuff -->
   <script type="importmap">
   {
     "imports": {
@@ -546,20 +552,20 @@
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
-    // ─── DOM refs ───
+    // dom nodes
     const loaderEl = document.getElementById('loader');
     const progressFill = document.getElementById('progress-fill');
     const percentEl = document.getElementById('loader-percent');
     const hintsEl = document.getElementById('controls-hint');
 
-    // ─── Scene ───
+    // scene setup
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x06060b);
 
-    // ─── Camera (matched to Blender viewport) ───
-    // Blender pivot (-0.7651, 0.3688, 1.7046) → Three.js target: (-0.7651, 1.7046, -0.3688)
-    // Blender cam pos via quaternion+distance → Three.js: (13.96, 9.72, 6.14)
-    // Blender viewport uses 50mm lens on 36mm sensor → ~28° vertical FOV
+    // trying to match blender viewport so we dont get distortion
+    // TODO: idk if these pivots are exactly right, maybe revisit if it feels off
+    // tbh i jsut copied the coordinates from the debug overlay lol
+    // 28 v-fov is roughly a 50mm lens
     const camera = new THREE.PerspectiveCamera(
       28,
       window.innerWidth / window.innerHeight,
@@ -567,14 +573,14 @@
       500
     );
 
-    // final positions — picked from live debug overlay
+    // hardcoded final positions from my debug output
     const TARGET_CAM_POS = new THREE.Vector3(0.857, 3.925, 4.559);
     const TARGET_LOOK_AT = new THREE.Vector3(-0.131, 0.081, 0.738);
 
-    // start camera slightly further out for a cinematic dolly-in
+    // pull back a bit for the intro dolly effect
     camera.position.copy(TARGET_CAM_POS).multiplyScalar(1.15);
 
-    // ─── Renderer ───
+    // setup renderer
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: 'high-performance'
@@ -588,7 +594,7 @@
     renderer.shadowMap.type = THREE.PCFShadowMap;
     document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-    // ─── Controls ───
+    // orbit controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
@@ -596,21 +602,21 @@
     controls.maxDistance = 40;
     controls.maxPolarAngle = Math.PI * 0.88;
     controls.target.copy(TARGET_LOOK_AT);
-    controls.enabled = false;           // disabled during intro animation
+    controls.enabled = false;           // lock it down until intro is done
     controls.update();
 
-    // ─── Lighting ───
-    const USE_CUSTOM_LIGHTS = false; // true = added studio lights, false = Blender export only
-    const GLB_LIGHT_INTENSITY = 0.0005;  // multiplier for Blender-exported lights
-    const GLB_LIGHT_TINT = 0xFF8C00;      // warm yellow tint color
-    const GLB_LIGHT_TINT_STRENGTH = 0.5; // 0 = no tint, 1 = fully replace with tint color
+    // lights
+    const USE_CUSTOM_LIGHTS = false; // toggle if we want custom lights or jsut blender exports
+    const GLB_LIGHT_INTENSITY = 0.0005;  // idk why exported lights are so strong, crushing them by a lot
+    const GLB_LIGHT_TINT = 0xFF8C00;      // tint to orange
+    const GLB_LIGHT_TINT_STRENGTH = 0.5; // 0 = no tint, 1 = max tint
 
     if (USE_CUSTOM_LIGHTS) {
-      // ambient fill
+      // fill
       const ambient = new THREE.AmbientLight(0xd0c8ff, 0.6);
       scene.add(ambient);
 
-      // key light (warm daylight)
+      // key
       const keyLight = new THREE.DirectionalLight(0xfff4e0, 2.2);
       keyLight.position.set(6, 10, 5);
       keyLight.castShadow = true;
@@ -624,28 +630,28 @@
       keyLight.shadow.bias = -0.0005;
       scene.add(keyLight);
 
-      // fill (cool blue)
+      // cool fill
       const fillLight = new THREE.DirectionalLight(0x9ab8e0, 0.8);
       fillLight.position.set(-5, 4, -3);
       scene.add(fillLight);
 
-      // rim / back accent
+      // rim
       const rimLight = new THREE.DirectionalLight(0xc8a0ff, 0.4);
       rimLight.position.set(-3, 6, -8);
       scene.add(rimLight);
 
-      // hemisphere for ground bounce
+      // bounce
       const hemi = new THREE.HemisphereLight(0x2a2840, 0x0a0a10, 0.5);
       scene.add(hemi);
     }
 
-    // ─── Fireflies ───
+    // firefly particles
     const FIREFLY_COUNT = 400;
-    const FIREFLY_SPREAD = 5;       // radius of spawn area
+    const FIREFLY_SPREAD = 5;       // spawn radius
     const FIREFLY_HEIGHT_MIN = 0.2;
     const FIREFLY_HEIGHT_MAX = 3.5;
 
-    // soft radial glow sprite
+    // draw a glowing circle onto a canvas so we dont need an image asset
     const ffCanvas = document.createElement('canvas');
     ffCanvas.width = 32; ffCanvas.height = 32;
     const ffCtx = ffCanvas.getContext('2d');
@@ -657,12 +663,12 @@
     ffCtx.fillRect(0, 0, 32, 32);
     const ffTexture = new THREE.CanvasTexture(ffCanvas);
 
-    // geometry — randomized positions + per-particle data
+    // prealloc arrays for performance
     const ffPositions = new Float32Array(FIREFLY_COUNT * 3);
-    const ffPhases = new Float32Array(FIREFLY_COUNT);     // random phase offset
-    const ffSpeeds = new Float32Array(FIREFLY_COUNT);     // drift speed
-    const ffBaseY = new Float32Array(FIREFLY_COUNT);      // base height
-    const ffRadii = new Float32Array(FIREFLY_COUNT);      // orbit radius
+    const ffPhases = new Float32Array(FIREFLY_COUNT);     // phase
+    const ffSpeeds = new Float32Array(FIREFLY_COUNT);     // drift
+    const ffBaseY = new Float32Array(FIREFLY_COUNT);      // height base
+    const ffRadii = new Float32Array(FIREFLY_COUNT);      // radius
 
     for (let i = 0; i < FIREFLY_COUNT; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -692,24 +698,24 @@
     const fireflies = new THREE.Points(ffGeo, ffMat);
     scene.add(fireflies);
 
-    // animate fireflies each frame
+    // tick fireflies
     function updateFireflies(elapsed) {
       const pos = ffGeo.attributes.position.array;
       for (let i = 0; i < FIREFLY_COUNT; i++) {
         const phase = ffPhases[i];
         const speed = ffSpeeds[i];
         const t = elapsed * speed + phase;
-        // gentle drift
+        // sway
         pos[i * 3] += Math.sin(t * 0.8) * 0.002;
         pos[i * 3 + 1] = ffBaseY[i] + Math.sin(t * 0.5) * 0.3;
         pos[i * 3 + 2] += Math.cos(t * 0.6) * 0.002;
       }
       ffGeo.attributes.position.needsUpdate = true;
-      // subtle global flicker
+      // kinda hacky but gives it a global flicker
       ffMat.opacity = 0.5 + Math.sin(elapsed * 1.5) * 0.2;
     }
 
-    // ─── Texture downscaler (keep VRAM tame for 134 MB model) ───
+    // downscale textures so it doesnt crash mobile browsers bc the glb is huge
     const MAX_TEX = 2048;
     const TEX_KEYS = [
       'map', 'normalMap', 'roughnessMap', 'metalnessMap',
@@ -747,7 +753,7 @@
       });
     }
 
-    // ─── Load Room.glb ───
+    // load the giant model
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
 
@@ -759,10 +765,10 @@
       (gltf) => {
         const model = gltf.scene;
 
-        // downscale oversized textures
+        // crunch textures
         shrinkAllTextures(model);
 
-        // enable shadows on every mesh + scale exported lights
+        // force shadows on everything, kinda expensive but looks better
         model.traverse(child => {
           if (child.isMesh) {
             child.castShadow = true;
@@ -778,7 +784,7 @@
 
 
 
-        // reveal
+        // fade out loader
         progressFill.style.width = '100%';
         percentEl.textContent = '100 %';
 
@@ -810,10 +816,10 @@
       introActive = true;
       introT = 0;
 
-      // allow clicking to skip straight into the cinematic sweep
+      // let them skip the intro if they click right away
       attachSweepListener();
 
-      // after intro dolly, show hints (if they haven't bypassed it yet)
+      // show hints if they didnt skip
       setTimeout(() => {
         if (!sweepActive && !window.__fireBurnActive) {
           hintsEl.classList.add('visible');
@@ -821,8 +827,8 @@
       }, INTRO_DURATION * 1000 + 400);
     }
 
-    // ─── Dev Mode Konami Code ───
-    const FORCE_DEV_MODE = false; // Set to true to bypass "atlearia" typing
+    // konami code for devmode
+    const FORCE_DEV_MODE = false; // set to true when debugging so u dont have to type it out every time
     window.__devMode = FORCE_DEV_MODE;
     if (window.__devMode) {
       document.body.classList.add('dev-mode');
@@ -832,7 +838,7 @@
     const konamiSequence = 'atlearia';
 
     window.addEventListener('keydown', (e) => {
-      // keep only the last letters typed
+      // buffer
       konamiBuffer += e.key.toLowerCase();
       if (konamiBuffer.length > konamiSequence.length) {
         konamiBuffer = konamiBuffer.substring(konamiBuffer.length - konamiSequence.length);
@@ -853,17 +859,17 @@
           hintsEl.style.display = 'none';
           console.log('[Dev Mode] Disabled.');
         }
-        konamiBuffer = ''; // reset after triggering
+        konamiBuffer = ''; // reset buffer
       }
     });
 
-    // smooth ease
+    // standard cubic ease
     function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
-    // starting camera position (slightly pulled back)
+    // intro cam
     const INTRO_START = TARGET_CAM_POS.clone().multiplyScalar(1.15);
 
-    // ─── Click-triggered cinematic sweep ───
+    // sweep vars
     const SWEEP_CAM_POS = new THREE.Vector3(-0.037, 2.121, 1.028);
     const SWEEP_TARGET = new THREE.Vector3(-0.037, 0.121, 1.028);
     const SWEEP_DURATION = 3.0; // seconds
@@ -874,7 +880,7 @@
     let sweepStartTarget = new THREE.Vector3();
     let sweepTriggered = false;
 
-    // smooth S-curve for professional feel
+    // better easing curve, stole this from easing.net
     function easeInOutQuart(t) {
       return t < 0.5
         ? 8 * t * t * t * t
@@ -885,7 +891,7 @@
       if (sweepTriggered) return;
       sweepTriggered = true;
 
-      // capture where we currently are
+      // snapshot current state so we can lerp from it
       sweepStartPos.copy(camera.position);
       sweepStartTarget.copy(controls.target);
 
@@ -893,13 +899,13 @@
       sweepT = 0;
       controls.enabled = false;
 
-      // trigger the text overlay fade-in 0.5s before landing (2.5s into the 3s sweep)
+      // trigger fadein early so it feels seamless
       setTimeout(() => {
         document.getElementById('coming-soon').classList.add('visible');
       }, 2500);
     }
 
-    // listen for first click/touch/key after model loaded
+    // attach listeners
     function attachSweepListener() {
       const trigger = () => {
         beginSweep();
@@ -912,14 +918,14 @@
       window.addEventListener('keydown', trigger, { once: true });
     }
 
-    // ─── Render loop ───
+    // main loop
     const clock = new THREE.Clock();
 
     function animate() {
       requestAnimationFrame(animate);
       const delta = clock.getDelta();
 
-      // phase 1: intro dolly (load → spawn)
+      // intro
       if (introActive) {
         introT += delta / INTRO_DURATION;
         if (introT >= 1) {
@@ -933,20 +939,20 @@
         controls.target.copy(TARGET_LOOK_AT);
       }
 
-      // phase 2: click-triggered cinematic sweep
+      // sweep
       if (sweepActive) {
         sweepT += delta / SWEEP_DURATION;
         const t = easeInOutQuart(Math.min(sweepT, 1));
         camera.position.lerpVectors(sweepStartPos, SWEEP_CAM_POS, t);
         controls.target.lerpVectors(sweepStartTarget, SWEEP_TARGET, t);
         camera.lookAt(controls.target);
-        // zero-out roll gradually so handoff to OrbitControls (which has 0 roll) is seamless
+        // orbitcontrols forces 0 roll so we gotta smooth it out or it snaps rly bad
         camera.rotation.z *= (1 - t);
 
         if (sweepT >= 1) {
           sweepT = 1;
           sweepActive = false;
-          // lock final position before re-enabling controls
+          // lock pos
           camera.position.copy(SWEEP_CAM_POS);
           controls.target.copy(SWEEP_TARGET);
           camera.lookAt(SWEEP_TARGET);
@@ -955,17 +961,17 @@
         }
       }
 
-      // only let OrbitControls touch the camera when no animation is running
+      // dont let orbit override animation
       if (!introActive && !sweepActive) {
         controls.update();
       }
 
-      // animate fireflies
+      // woooo fireflies
       updateFireflies(clock.elapsedTime);
 
       renderer.render(scene, camera);
 
-      // live debug coords
+      // debug prints
       const cp = camera.position;
       const ct = controls.target;
       const rot = camera.rotation;
@@ -975,7 +981,7 @@
         `target:   (${ct.x.toFixed(3)}, ${ct.y.toFixed(3)}, ${ct.z.toFixed(3)})\n` +
         `rot:      (${toDeg(rot.x).toFixed(1)}°, ${toDeg(rot.y).toFixed(1)}°, ${toDeg(rot.z).toFixed(1)}°)`;
 
-      // recording
+      // recorder hack
       if (window.__recording) {
         const ms = (performance.now() - window.__recStart).toFixed(1);
         window.__recLog.push(
@@ -988,14 +994,14 @@
     }
     animate();
 
-    // ─── Resize ───
+    // resize handler
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // ─── Context loss safety ───
+    // catch context loss so it doesnt just die silently
     renderer.domElement.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
       console.warn('WebGL context lost');
