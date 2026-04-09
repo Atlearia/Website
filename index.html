@@ -340,7 +340,7 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
+      transform: translate(-50%, calc(-50% - 50px));
       color: #ffd8a8;
       font-family: 'Cormorant Garamond', serif;
       font-size: 4rem;
@@ -350,7 +350,7 @@
       text-shadow: 0 0 20px rgba(255, 180, 100, 0.4), 0 0 40px rgba(255, 140, 50, 0.2);
       opacity: 0;
       visibility: hidden;
-      transition: opacity 2.5s ease-in, visibility 2.5s ease-in;
+      transition: opacity 1s ease-in-out, visibility 1s ease-in-out;
       pointer-events: none;
       z-index: 100;
     }
@@ -885,6 +885,11 @@
       sweepActive = true;
       sweepT = 0;
       controls.enabled = false;
+
+      // trigger the text overlay fade-in 0.5s before landing (2.5s into the 3s sweep)
+      setTimeout(() => {
+        document.getElementById('coming-soon').classList.add('visible');
+      }, 2500);
     }
 
     // listen for first click/touch/key after model loaded
@@ -940,11 +945,6 @@
           camera.lookAt(SWEEP_TARGET);
           controls.update();
           controls.enabled = window.__devMode;
-
-          // trigger the text overlay fade-in 0.5s after landing
-          setTimeout(() => {
-            document.getElementById('coming-soon').classList.add('visible');
-          }, 500);
         }
       }
 
