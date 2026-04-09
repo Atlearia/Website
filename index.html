@@ -815,7 +815,12 @@
     }
 
     // ─── Dev Mode Konami Code ───
-    window.__devMode = false;
+    const FORCE_DEV_MODE = false; // Set to true to bypass "atlearia" typing
+    window.__devMode = FORCE_DEV_MODE;
+    if (window.__devMode) {
+      document.body.classList.add('dev-mode');
+    }
+    
     let konamiBuffer = '';
     const konamiSequence = 'atlearia';
 
