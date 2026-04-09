@@ -277,6 +277,15 @@
     }
 
     /* Debug coordinate overlay */
+    /* ── Dev Tools (hidden by default) ── */
+    #debug-coords, #record-btn, #controls-hint {
+      display: none;
+    }
+    body.dev-mode #debug-coords,
+    body.dev-mode #record-btn {
+      display: block;
+    }
+
     #debug-coords {
       position: fixed;
       top: 16px;
@@ -325,6 +334,30 @@
         opacity: 0.4;
       }
     }
+
+    /* ── Book Overlay ── */
+    #coming-soon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #ffd8a8;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 4rem;
+      font-style: italic;
+      font-weight: 400;
+      letter-spacing: 6px;
+      text-shadow: 0 0 20px rgba(255, 180, 100, 0.4), 0 0 40px rgba(255, 140, 50, 0.2);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 2.5s ease-in, visibility 2.5s ease-in;
+      pointer-events: none;
+      z-index: 100;
+    }
+    #coming-soon.visible {
+      opacity: 1;
+      visibility: visible;
+    }
   </style>
 </head>
 
@@ -359,6 +392,9 @@
     <div class="hint-item"><span class="hint-key">RMB</span> Pan</div>
     <div class="hint-item"><span class="hint-key">Scroll</span> Zoom</div>
   </div>
+
+  <!-- Book writing overlay -->
+  <div id="coming-soon">Coming soon...</div>
 
   <!-- Three.js canvas mount -->
   <div id="canvas-container"></div>
@@ -778,6 +814,37 @@
       }, INTRO_DURATION * 1000 + 400);
     }
 
+    // ─── Dev Mode Konami Code ───
+    window.__devMode = false;
+    let konamiBuffer = '';
+    const konamiSequence = 'atlearia';
+
+    window.addEventListener('keydown', (e) => {
+      // keep only the last letters typed
+      konamiBuffer += e.key.toLowerCase();
+      if (konamiBuffer.length > konamiSequence.length) {
+        konamiBuffer = konamiBuffer.substring(konamiBuffer.length - konamiSequence.length);
+      }
+
+      if (konamiBuffer === konamiSequence) {
+        window.__devMode = !window.__devMode;
+        if (window.__devMode) {
+          document.body.classList.add('dev-mode');
+          controls.enabled = true;
+          hintsEl.classList.add('visible');
+          hintsEl.style.display = 'flex';
+          console.log('[Dev Mode] Enabled orbit controls & debug UI.');
+        } else {
+          document.body.classList.remove('dev-mode');
+          controls.enabled = false;
+          hintsEl.classList.remove('visible');
+          hintsEl.style.display = 'none';
+          console.log('[Dev Mode] Disabled.');
+        }
+        konamiBuffer = ''; // reset after triggering
+      }
+    });
+
     // smooth ease
     function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
@@ -841,7 +908,7 @@
         if (introT >= 1) {
           introT = 1;
           introActive = false;
-          controls.enabled = true;
+          controls.enabled = window.__devMode;
         }
         const t = easeOutCubic(Math.min(introT, 1));
         camera.position.lerpVectors(INTRO_START, TARGET_CAM_POS, t);
@@ -860,13 +927,19 @@
         camera.rotation.z *= (1 - t);
 
         if (sweepT >= 1) {
+          sweepT = 1;
           sweepActive = false;
           // lock final position before re-enabling controls
           camera.position.copy(SWEEP_CAM_POS);
           controls.target.copy(SWEEP_TARGET);
           camera.lookAt(SWEEP_TARGET);
           controls.update();
-          controls.enabled = true;
+          controls.enabled = window.__devMode;
+
+          // trigger the text overlay fade-in 0.5s after landing
+          setTimeout(() => {
+            document.getElementById('coming-soon').classList.add('visible');
+          }, 500);
         }
       }
 
