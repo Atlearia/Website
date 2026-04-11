@@ -356,11 +356,169 @@
       transition: opacity 1s ease-in-out, visibility 1s ease-in-out;
       pointer-events: none;
       z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
     }
 
     #coming-soon.visible {
       opacity: 1;
       visibility: visible;
+      pointer-events: auto;
+    }
+
+    .coming-soon-subtitle {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-style: normal;
+      font-weight: 300;
+      letter-spacing: 2px;
+      color: #ffd8a8;
+      text-shadow: 0 0 20px rgba(255, 180, 100, 0.4), 0 0 40px rgba(255, 140, 50, 0.2);
+      margin-top: 12px;
+      text-transform: none;
+    }
+
+    .coming-soon-buttons {
+      display: flex;
+      gap: 80px;
+      margin-top: 24px;
+    }
+
+    .cs-btn {
+      padding: 10px 36px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 15px;
+      font-weight: 600;
+      font-style: normal;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-decoration: none;
+      border: 1.5px solid rgba(90, 55, 20, 0.5);
+      border-radius: 4px;
+      background: rgba(60, 35, 10, 0.35);
+      color: #f5dbb5;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      box-shadow: inset 0 1px 0 rgba(255, 220, 160, 0.15),
+        0 2px 8px rgba(30, 15, 0, 0.3);
+    }
+
+    .cs-btn:hover {
+      background: rgba(80, 45, 10, 0.5);
+      border-color: rgba(200, 150, 60, 0.6);
+      box-shadow: inset 0 1px 0 rgba(255, 220, 160, 0.25),
+        0 0 16px rgba(200, 150, 60, 0.25),
+        0 4px 12px rgba(30, 15, 0, 0.3);
+      color: #ffe8c4;
+      transform: translateY(-2px);
+    }
+
+    .cs-btn:active {
+      transform: translateY(0);
+    }
+
+    #cv-btn {
+      margin-left: 30px;
+    }
+
+    .cs-btn-github {
+      margin-left: 60px;
+    }
+
+    /* CV modal overlay */
+    #cv-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6, 6, 11, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    #cv-modal.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .cv-modal-inner {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      max-width: 90vw;
+      max-height: 90vh;
+    }
+
+    .cv-modal-close {
+      position: absolute;
+      top: -14px;
+      right: -14px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(160, 140, 255, 0.3);
+      background: rgba(20, 18, 35, 0.9);
+      color: var(--text-primary);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      z-index: 10;
+      line-height: 1;
+    }
+
+    .cv-modal-close:hover {
+      background: rgba(160, 140, 255, 0.2);
+      border-color: rgba(160, 140, 255, 0.5);
+      transform: scale(1.1);
+    }
+
+    .cv-embed {
+      width: 680px;
+      max-width: 88vw;
+      height: 78vh;
+      border: 1px solid rgba(160, 140, 255, 0.15);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .cv-download-btn {
+      padding: 10px 28px;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-decoration: none;
+      border: 1px solid rgba(232, 196, 124, 0.3);
+      border-radius: 6px;
+      background: rgba(232, 196, 124, 0.08);
+      color: var(--accent-warm);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .cv-download-btn:hover {
+      background: rgba(232, 196, 124, 0.18);
+      border-color: rgba(232, 196, 124, 0.5);
+      box-shadow: 0 0 18px rgba(232, 196, 124, 0.12);
+      transform: translateY(-2px);
     }
   </style>
 </head>
@@ -397,7 +555,32 @@
   </div>
 
   <!-- Book writing overlay -->
-  <div id="coming-soon">Coming soon...</div>
+  <div id="coming-soon">
+    <span>Coming soon!</span>
+    <div class="coming-soon-subtitle">Meanwhile...</div>
+    <div class="coming-soon-buttons">
+      <button class="cs-btn" id="cv-btn" onclick="openCvModal()">CV</button>
+      <a class="cs-btn cs-btn-github" href="https://github.com/Atlearia" target="_blank"
+        rel="noopener noreferrer">Github</a>
+    </div>
+  </div>
+
+  <!-- CV modal -->
+  <div id="cv-modal">
+    <div class="cv-modal-inner">
+      <button class="cv-modal-close" onclick="closeCvModal()" aria-label="Close">&times;</button>
+      <iframe class="cv-embed" src="Resume.pdf" title="Resume"></iframe>
+      <a class="cv-download-btn" href="Resume.pdf" download="Resume.pdf">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        Download PDF
+      </a>
+    </div>
+  </div>
 
   <!-- why are you stalking my code? -->
   <!-- i mean, i guess it's flattering -->
@@ -407,6 +590,41 @@
   <!-- what if intelligence was never the gift we thought it was, but simply fire's way of finding a more efficient way to spread? -->
 
   <div id="canvas-container"></div>
+
+  <!-- CV modal handlers -->
+  <script>
+    function openCvModal() {
+      const modal = document.getElementById('cv-modal');
+      modal.style.display = 'flex';
+      // small delay so the transition actually plays
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          modal.classList.add('open');
+        });
+      });
+    }
+
+    function closeCvModal() {
+      const modal = document.getElementById('cv-modal');
+      modal.classList.remove('open');
+      setTimeout(() => {
+        modal.style.display = 'none';
+      }, 400);
+    }
+
+    // close on backdrop click
+    document.addEventListener('DOMContentLoaded', () => {
+      const modal = document.getElementById('cv-modal');
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeCvModal();
+      });
+    });
+
+    // esc to close
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeCvModal();
+    });
+  </script>
 
   <!-- dirty script to grab cam coords for debugging -->
   <script>
@@ -540,8 +758,8 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "./node_modules/three/build/three.module.js",
-      "three/addons/": "./node_modules/three/examples/jsm/"
+      "three": "https://unpkg.com/three@0.183.2/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.183.2/examples/jsm/"
     }
   }
   </script>
