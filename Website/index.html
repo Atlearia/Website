@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <meta name="description" content="Atlearia — an immersive 3D room experience">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Cormorant+Garamond:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-deep: #06060b;
+      --bg-surface: #0c0c14;
+      --accent-primary: #a08cff;
+      --accent-warm: #e8c47c;
+      --accent-glow: rgba(160, 140, 255, 0.12);
+      --text-primary: #e8e4f0;
+      --text-muted: rgba(200, 195, 230, 0.4);
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-deep);
+      font-family: 'Inter', -apple-system, sans-serif;
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Canvas ── */
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Loading Screen ── */
+    #loader {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-deep);
+      transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #loader.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    /* background particles for loader */
+    #particle-canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
+
+    .loader-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    /* drawing the spinning rings */
+    .loader-sigil {
+      width: 80px;
+      height: 80px;
+      position: relative;
+      margin-bottom: 36px;
+    }
+
+    .sigil-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 1.5px solid transparent;
+    }
+
+    .sigil-ring-outer {
+      border-top-color: var(--accent-primary);
+      border-right-color: rgba(160, 140, 255, 0.3);
+      animation: sigil-spin 3s linear infinite;
+    }
+
+    .sigil-ring-inner {
+      inset: 12px;
+      border-bottom-color: var(--accent-warm);
+      border-left-color: rgba(232, 196, 124, 0.3);
+      animation: sigil-spin 2s linear infinite reverse;
+    }
+
+    .sigil-dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      box-shadow: 0 0 20px var(--accent-primary),
+        0 0 40px rgba(160, 140, 255, 0.3);
+      animation: sigil-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes sigil-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes sigil-pulse {
+
+      0%,
+      100% {
+        opacity: 0.6;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.4);
+      }
+    }
+
+    .loader-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px;
+      font-weight: 300;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      opacity: 0;
+      animation: fade-up 0.8s ease forwards 0.2s;
+    }
+
+    .loader-subtitle {
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 40px;
+      opacity: 0;
+      animation: fade-up 0.8s ease forwards 0.5s;
+    }
+
+    .progress-track {
+      width: 240px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 1px;
+      overflow: hidden;
+      position: relative;
+      opacity: 0;
+      animation: fade-up 0.8s ease forwards 0.7s;
+    }
+
+    .progress-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-warm));
+      border-radius: 1px;
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .progress-glow {
+      position: absolute;
+      top: -4px;
+      right: -2px;
+      width: 20px;
+      height: 9px;
+      background: radial-gradient(ellipse, var(--accent-primary), transparent);
+      filter: blur(3px);
+      opacity: 0.8;
+    }
+
+    .loader-percent {
+      margin-top: 16px;
+      font-size: 12px;
+      font-weight: 400;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 2px;
+      color: rgba(160, 140, 255, 0.6);
+      opacity: 0;
+      animation: fade-up 0.8s ease forwards 0.9s;
+    }
+
+    @keyframes fade-up {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* hints UI */
+    .ui-fade {
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+      pointer-events: none;
+    }
+
+    .ui-fade.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    #controls-hint {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 24px;
+      transition-delay: 0.6s;
+    }
+
+    .hint-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      color: rgba(200, 195, 230, 0.25);
+    }
+
+    .hint-key {
+      padding: 3px 8px;
+      border: 1px solid rgba(160, 140, 255, 0.1);
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 400;
+      color: rgba(160, 140, 255, 0.4);
+      background: rgba(160, 140, 255, 0.03);
+    }
+
+    /* debug stuff */
+    /* devmode tools, hidden unless u enter konami code */
+    #debug-coords,
+    #record-btn,
+    #controls-hint {
+      display: none;
+    }
+
+    body.dev-mode #debug-coords,
+    body.dev-mode #record-btn {
+      display: block;
+    }
+
+    #debug-coords {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 50;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(160, 140, 255, 0.2);
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #a0ffa0;
+      pointer-events: none;
+      white-space: pre;
+    }
+
+    #record-btn {
+      position: fixed;
+      top: 16px;
+      left: 340px;
+      z-index: 50;
+      padding: 8px 14px;
+      background: rgba(255, 60, 60, 0.15);
+      border: 1px solid rgba(255, 60, 60, 0.4);
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #ff6060;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #record-btn:hover {
+      background: rgba(255, 60, 60, 0.3);
+    }
+
+    #record-btn.recording {
+      color: #ff3030;
+      border-color: #ff3030;
+      animation: rec-blink 0.6s ease infinite;
+    }
+
+    @keyframes rec-blink {
+      50% {
+        opacity: 0.4;
+      }
+    }
+
+    /* coming soon text over the book */
+    #coming-soon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, calc(-50% - 50px));
+      color: #ffd8a8;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1.8rem, 6vw, 4rem);
+      font-style: italic;
+      font-weight: 400;
+      letter-spacing: clamp(2px, 1vw, 6px);
+      text-shadow: 0 0 20px rgba(255, 180, 100, 0.4), 0 0 40px rgba(255, 140, 50, 0.2);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 1s ease-in-out, visibility 1s ease-in-out;
+      pointer-events: none;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      width: 90vw;
+      text-align: center;
+    }
+
+    #coming-soon.visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .coming-soon-subtitle {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(0.7rem, 2.5vw, 0.95rem);
+      font-style: normal;
+      font-weight: 300;
+      letter-spacing: 2px;
+      color: #ffd8a8;
+      text-shadow: 0 0 20px rgba(255, 180, 100, 0.4), 0 0 40px rgba(255, 140, 50, 0.2);
+      margin-top: 12px;
+      text-transform: none;
+    }
+
+    .coming-soon-buttons {
+      display: flex;
+      gap: clamp(20px, 8vw, 80px);
+      margin-top: 24px;
+    }
+
+    .cs-btn {
+      padding: 10px clamp(20px, 5vw, 36px);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(13px, 2.5vw, 15px);
+      font-weight: 600;
+      font-style: normal;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-decoration: none;
+      border: 1.5px solid rgba(90, 55, 20, 0.5);
+      border-radius: 4px;
+      background: rgba(60, 35, 10, 0.35);
+      color: #f5dbb5;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      box-shadow: inset 0 1px 0 rgba(255, 220, 160, 0.15),
+        0 2px 8px rgba(30, 15, 0, 0.3);
+    }
+
+    .cs-btn:hover {
+      background: rgba(80, 45, 10, 0.5);
+      border-color: rgba(200, 150, 60, 0.6);
+      box-shadow: inset 0 1px 0 rgba(255, 220, 160, 0.25),
+        0 0 16px rgba(200, 150, 60, 0.25),
+        0 4px 12px rgba(30, 15, 0, 0.3);
+      color: #ffe8c4;
+      transform: translateY(-2px);
+    }
+
+    .cs-btn:active {
+      transform: translateY(0);
+    }
+
+    #cv-btn {
+      margin-left: 30px;
+    }
+
+    .cs-btn-github {
+      margin-left: 60px;
+    }
+
+    /* tap prompt for mobile */
+    #tap-prompt {
+      position: fixed;
+      bottom: 15%;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px;
+      font-weight: 400;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(255, 216, 168, 0.5);
+      text-shadow: 0 0 12px rgba(255, 180, 100, 0.3);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+      pointer-events: none;
+      animation: tap-pulse 2.5s ease-in-out infinite;
+      white-space: nowrap;
+    }
+
+    #tap-prompt.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    @keyframes tap-pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.9; }
+    }
+
+    /* ── Mobile overrides ── */
+    @media (max-width: 768px) {
+      #coming-soon {
+        transform: translate(-50%, -50%);
+      }
+
+      #cv-btn {
+        margin-left: 0;
+      }
+
+      .cs-btn-github {
+        margin-left: 0;
+      }
+
+      .cv-embed {
+        width: 95vw;
+        height: 70vh;
+      }
+
+      .cv-modal-close {
+        top: -10px;
+        right: -5px;
+        width: 40px;
+        height: 40px;
+        font-size: 22px;
+      }
+
+      .loader-title {
+        font-size: 22px;
+        letter-spacing: 4px;
+      }
+
+      .progress-track {
+        width: 180px;
+      }
+    }
+
+    /* CV modal overlay */
+    #cv-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6, 6, 11, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    #cv-modal.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .cv-modal-inner {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      max-width: 90vw;
+      max-height: 90vh;
+    }
+
+    .cv-modal-close {
+      position: absolute;
+      top: -14px;
+      right: -14px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(160, 140, 255, 0.3);
+      background: rgba(20, 18, 35, 0.9);
+      color: var(--text-primary);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      z-index: 10;
+      line-height: 1;
+    }
+
+    .cv-modal-close:hover {
+      background: rgba(160, 140, 255, 0.2);
+      border-color: rgba(160, 140, 255, 0.5);
+      transform: scale(1.1);
+    }
+
+    .cv-embed {
+      width: 680px;
+      max-width: 88vw;
+      height: 78vh;
+      border: 1px solid rgba(160, 140, 255, 0.15);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .cv-download-btn {
+      padding: 10px 28px;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-decoration: none;
+      border: 1px solid rgba(232, 196, 124, 0.3);
+      border-radius: 6px;
+      background: rgba(232, 196, 124, 0.08);
+      color: var(--accent-warm);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .cv-download-btn:hover {
+      background: rgba(232, 196, 124, 0.18);
+      border-color: rgba(232, 196, 124, 0.5);
+      box-shadow: 0 0 18px rgba(232, 196, 124, 0.12);
+      transform: translateY(-2px);
+    }
+
+    /* ── Guestbook modal ── */
+    #guestbook-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6, 6, 11, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    #guestbook-modal.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .gb-modal-inner {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 420px;
+      max-width: 90vw;
+      padding: 36px 32px;
+      background: rgba(12, 12, 20, 0.92);
+      border: 1px solid rgba(160, 140, 255, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5),
+        0 0 80px rgba(160, 140, 255, 0.06);
+    }
+
+    .gb-modal-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid rgba(160, 140, 255, 0.2);
+      background: rgba(20, 18, 35, 0.8);
+      color: var(--text-primary);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      z-index: 10;
+      line-height: 1;
+    }
+
+    .gb-modal-close:hover {
+      background: rgba(160, 140, 255, 0.2);
+      border-color: rgba(160, 140, 255, 0.5);
+      transform: scale(1.1);
+    }
+
+    .gb-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 400;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent-warm);
+      text-shadow: 0 0 16px rgba(255, 180, 100, 0.25);
+      text-align: center;
+    }
+
+    .gb-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .gb-label {
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .gb-input,
+    .gb-textarea {
+      width: 100%;
+      padding: 10px 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 300;
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(160, 140, 255, 0.12);
+      border-radius: 6px;
+      outline: none;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .gb-input:focus,
+    .gb-textarea:focus {
+      border-color: rgba(160, 140, 255, 0.35);
+      box-shadow: 0 0 12px rgba(160, 140, 255, 0.08);
+    }
+
+    .gb-input::placeholder,
+    .gb-textarea::placeholder {
+      color: rgba(200, 195, 230, 0.2);
+    }
+
+    .gb-textarea {
+      resize: vertical;
+      min-height: 100px;
+      max-height: 200px;
+      line-height: 1.5;
+    }
+
+    .gb-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .gb-char-count {
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      transition: color 0.3s;
+    }
+
+    .gb-char-count.warn {
+      color: rgba(255, 160, 80, 0.7);
+    }
+
+    .gb-char-count.over {
+      color: rgba(255, 80, 80, 0.8);
+    }
+
+    .gb-send-btn {
+      padding: 10px 28px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      border: 1.5px solid rgba(90, 55, 20, 0.5);
+      border-radius: 4px;
+      background: rgba(60, 35, 10, 0.35);
+      color: #f5dbb5;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      box-shadow: inset 0 1px 0 rgba(255, 220, 160, 0.15),
+        0 2px 8px rgba(30, 15, 0, 0.3);
+    }
+
+    .gb-send-btn:hover:not(:disabled) {
+      background: rgba(80, 45, 10, 0.5);
+      border-color: rgba(200, 150, 60, 0.6);
+      box-shadow: inset 0 1px 0 rgba(255, 220, 160, 0.25),
+        0 0 16px rgba(200, 150, 60, 0.25),
+        0 4px 12px rgba(30, 15, 0, 0.3);
+      color: #ffe8c4;
+      transform: translateY(-2px);
+    }
+
+    .gb-send-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .gb-status {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 300;
+      min-height: 20px;
+      transition: opacity 0.3s;
+    }
+
+    .gb-status.success {
+      color: rgba(160, 255, 160, 0.7);
+    }
+
+    .gb-status.error {
+      color: rgba(255, 100, 100, 0.7);
+    }
+
+    @media (max-width: 768px) {
+      .gb-modal-inner {
+        padding: 28px 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Loading screen -->
+  <div id="loader">
+    <canvas id="particle-canvas"></canvas>
+    <div class="loader-content">
+      <div class="loader-sigil">
+        <div class="sigil-ring sigil-ring-outer"></div>
+        <div class="sigil-ring sigil-ring-inner"></div>
+        <div class="sigil-dot"></div>
+      </div>
+      <div class="loader-title">ningye.ca</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill">
+          <div class="progress-glow"></div>
+        </div>
+      </div>
+      <div class="loader-percent" id="loader-percent">0 %</div>
+    </div>
+  </div>
+
+  <!-- Debug coordinate readout -->
+  <div id="debug-coords">cam: loading...</div>
+  <button id="record-btn" onclick="startRecording()">● REC 7s</button>
+
+  <!-- Post-load controls hint -->
+  <div id="controls-hint" class="ui-fade">
+    <div class="hint-item"><span class="hint-key">LMB</span> Orbit</div>
+    <div class="hint-item"><span class="hint-key">RMB</span> Pan</div>
+    <div class="hint-item"><span class="hint-key">Scroll</span> Zoom</div>
+  </div>
+
+  <!-- Tap prompt for mobile -->
+  <div id="tap-prompt">Tap to enter</div>
+
+  <!-- Book writing overlay -->
+  <div id="coming-soon">
+    <span>Coming soon!</span>
+    <div class="coming-soon-subtitle">Meanwhile...</div>
+    <div class="coming-soon-buttons">
+      <button class="cs-btn" id="cv-btn" onclick="openCvModal()">CV</button>
+      <button class="cs-btn" id="guestbook-btn" onclick="openGuestbook()">Write to me</button>
+      <a class="cs-btn cs-btn-github" href="https://github.com/Atlearia" target="_blank"
+        rel="noopener noreferrer">Github</a>
+    </div>
+  </div>
+
+  <!-- CV modal -->
+  <div id="cv-modal">
+    <div class="cv-modal-inner">
+      <button class="cv-modal-close" onclick="closeCvModal()" aria-label="Close">&times;</button>
+      <iframe class="cv-embed" src="Resume.pdf" title="Resume"></iframe>
+      <a class="cv-download-btn" href="Resume.pdf" download="Resume.pdf">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        Download PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- Guestbook modal -->
+  <div id="guestbook-modal">
+    <div class="gb-modal-inner">
+      <button class="gb-modal-close" onclick="closeGuestbook()" aria-label="Close">&times;</button>
+      <div class="gb-title">Write to me</div>
+      <div class="gb-field">
+        <label class="gb-label" for="gb-name">Name (optional)</label>
+        <input class="gb-input" type="text" id="gb-name" placeholder="your name" maxlength="50" autocomplete="off">
+      </div>
+      <div class="gb-field">
+        <label class="gb-label" for="gb-message">Message</label>
+        <textarea class="gb-textarea" id="gb-message" placeholder="write something..." maxlength="500"></textarea>
+      </div>
+      <div class="gb-footer">
+        <span class="gb-char-count" id="gb-char-count">0 / 500</span>
+        <button class="gb-send-btn" id="gb-send" onclick="sendGuestbook()">Send</button>
+      </div>
+      <div class="gb-status" id="gb-status"></div>
+    </div>
+  </div>
+
+  <!-- why are you stalking my code? -->
+  <!-- i mean, i guess it's flattering -->
+  <!-- do you think humans control fire because they got smarter, or did cooking food make them smarter -->
+  <!-- slightly smarter ape stumbles onto fire, eats better, has a smarter kid, that kid uses fire more cleverly, and so on in a loop -->
+  <!-- but then again, other animals have encountered fire and never ran with it, so maybe there was already something different about early humans before the cooking even started -->
+  <!-- what if intelligence was never the gift we thought it was, but simply fire's way of finding a more efficient way to spread? -->
+
+  <div id="canvas-container"></div>
+
+  <!-- CV modal handlers -->
+  <script>
+    function openCvModal() {
+      // iOS doesn't render PDF in iframes, just open it directly on mobile
+      const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
+      if (mobile) {
+        window.open('Resume.pdf', '_blank');
+        return;
+      }
+      const modal = document.getElementById('cv-modal');
+      modal.style.display = 'flex';
+      // small delay so the transition actually plays
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          modal.classList.add('open');
+        });
+      });
+    }
+
+    function closeCvModal() {
+      const modal = document.getElementById('cv-modal');
+      modal.classList.remove('open');
+      setTimeout(() => {
+        modal.style.display = 'none';
+      }, 400);
+    }
+
+    // close on backdrop click
+    document.addEventListener('DOMContentLoaded', () => {
+      const modal = document.getElementById('cv-modal');
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeCvModal();
+      });
+    });
+
+    // esc to close
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeCvModal();
+        closeGuestbook();
+      }
+    });
+  </script>
+
+  <!-- Guestbook handlers -->
+  <script>
+    const GB_API = 'https://mathexercice.onrender.com/api/guestbook';
+
+    function openGuestbook() {
+      const modal = document.getElementById('guestbook-modal');
+      modal.style.display = 'flex';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          modal.classList.add('open');
+        });
+      });
+      // reset form
+      document.getElementById('gb-name').value = '';
+      document.getElementById('gb-message').value = '';
+      document.getElementById('gb-char-count').textContent = '0 / 500';
+      document.getElementById('gb-char-count').className = 'gb-char-count';
+      document.getElementById('gb-status').textContent = '';
+      document.getElementById('gb-status').className = 'gb-status';
+      document.getElementById('gb-send').disabled = false;
+    }
+
+    function closeGuestbook() {
+      const modal = document.getElementById('guestbook-modal');
+      modal.classList.remove('open');
+      setTimeout(() => {
+        modal.style.display = 'none';
+      }, 400);
+    }
+
+    // close on backdrop click
+    document.addEventListener('DOMContentLoaded', () => {
+      const modal = document.getElementById('guestbook-modal');
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeGuestbook();
+      });
+    });
+
+    // char counter
+    document.addEventListener('DOMContentLoaded', () => {
+      const textarea = document.getElementById('gb-message');
+      const counter = document.getElementById('gb-char-count');
+      textarea.addEventListener('input', () => {
+        const len = textarea.value.length;
+        counter.textContent = len + ' / 500';
+        counter.className = 'gb-char-count' + (len > 480 ? ' over' : len > 400 ? ' warn' : '');
+      });
+    });
+
+    async function sendGuestbook() {
+      const nameEl = document.getElementById('gb-name');
+      const msgEl = document.getElementById('gb-message');
+      const statusEl = document.getElementById('gb-status');
+      const sendBtn = document.getElementById('gb-send');
+
+      const message = msgEl.value.trim();
+      if (!message) {
+        statusEl.textContent = 'Please write something first.';
+        statusEl.className = 'gb-status error';
+        return;
+      }
+
+      sendBtn.disabled = true;
+      statusEl.textContent = 'Sending...';
+      statusEl.className = 'gb-status';
+
+      try {
+        const res = await fetch(GB_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: nameEl.value.trim() || undefined,
+            message: message,
+          }),
+        });
+
+        if (res.ok) {
+          statusEl.textContent = 'Sent — thank you!';
+          statusEl.className = 'gb-status success';
+          msgEl.value = '';
+          nameEl.value = '';
+          document.getElementById('gb-char-count').textContent = '0 / 500';
+          document.getElementById('gb-char-count').className = 'gb-char-count';
+          // keep disabled for a moment so they see the confirmation
+          setTimeout(() => { sendBtn.disabled = false; }, 3000);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          statusEl.textContent = data.error || 'Something went wrong. Try again.';
+          statusEl.className = 'gb-status error';
+          sendBtn.disabled = false;
+        }
+      } catch (err) {
+        statusEl.textContent = 'Network error. Try again.';
+        statusEl.className = 'gb-status error';
+        sendBtn.disabled = false;
+      }
+    }
+  </script>
+
+  <!-- dirty script to grab cam coords for debugging -->
+  <script>
+    function startRecording() {
+      const btn = document.getElementById('record-btn');
+      if (window.__recording) return;
+
+      window.__recording = true;
+      window.__recStart = performance.now();
+      window.__recLog = [];
+      btn.classList.add('recording');
+      btn.textContent = '● REC...';
+
+      setTimeout(() => {
+        window.__recording = false;
+        btn.classList.remove('recording');
+        btn.textContent = '● REC 7s';
+        showRecLog(window.__recLog.join('\n'));
+      }, 7000);
+    }
+
+    function showRecLog(text) {
+      // nuke old overlay first
+      const old = document.getElementById('rec-overlay');
+      if (old) old.remove();
+
+      const div = document.createElement('div');
+      div.id = 'rec-overlay';
+      div.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;';
+
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'width:80%;height:60%;background:#111;color:#a0ffa0;border:1px solid #333;border-radius:8px;padding:12px;font:11px/1.4 "Courier New",monospace;resize:none;';
+      ta.readOnly = true;
+
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:12px;';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.textContent = '📋 Copy All';
+      copyBtn.style.cssText = 'padding:8px 20px;background:#2a2a40;color:#a0ffa0;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:13px;';
+      copyBtn.onclick = () => { navigator.clipboard.writeText(text); copyBtn.textContent = '✓ Copied!'; };
+
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '✕ Close';
+      closeBtn.style.cssText = 'padding:8px 20px;background:#2a2a40;color:#ff6060;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:13px;';
+      closeBtn.onclick = () => div.remove();
+
+      btnRow.appendChild(copyBtn);
+      btnRow.appendChild(closeBtn);
+      div.appendChild(ta);
+      div.appendChild(btnRow);
+      document.body.appendChild(div);
+    }
+  </script>
+
+  <!-- particle system for loader, drawn on 2d context bc webgl takes too long to init -->
+  <script>
+    (function initParticles() {
+      const canvas = document.getElementById('particle-canvas');
+      const ctx = canvas.getContext('2d');
+      let W, H;
+      const particles = [];
+      const PARTICLE_COUNT = 60;
+
+      function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        particles.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: (Math.random() - 0.5) * 0.3,
+          r: Math.random() * 1.5 + 0.5,
+          alpha: Math.random() * 0.25 + 0.05,
+          pulse: Math.random() * Math.PI * 2,
+        });
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        for (const p of particles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.pulse += 0.01;
+
+          if (p.x < 0) p.x = W;
+          if (p.x > W) p.x = 0;
+          if (p.y < 0) p.y = H;
+          if (p.y > H) p.y = 0;
+
+          const a = p.alpha * (0.6 + 0.4 * Math.sin(p.pulse));
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(160, 140, 255, ${a})`;
+          ctx.fill();
+        }
+
+        // connects particles together if they get close enough, looks cool
+        for (let i = 0; i < particles.length; i++) {
+          for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 140) {
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.strokeStyle = `rgba(160, 140, 255, ${0.06 * (1 - dist / 140)})`;
+              ctx.lineWidth = 0.5;
+              ctx.stroke();
+            }
+          }
+        }
+
+        if (!document.getElementById('loader').classList.contains('hidden')) {
+          requestAnimationFrame(draw);
+        }
+      }
+      draw();
+    })();
+  </script>
+
+  <!-- main 3d stuff -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.183.2/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.183.2/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+    // dom nodes
+    const loaderEl = document.getElementById('loader');
+    const progressFill = document.getElementById('progress-fill');
+    const percentEl = document.getElementById('loader-percent');
+    const hintsEl = document.getElementById('controls-hint');
+
+    // detect mobile for performance tuning
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+    // scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x06060b);
+
+    // trying to match blender viewport so we dont get distortion
+    // TODO: idk if these pivots are exactly right, maybe revisit if it feels off
+    // tbh i jsut copied the coordinates from the debug overlay lol
+    // 28 v-fov is roughly a 50mm lens
+    const camera = new THREE.PerspectiveCamera(
+      28,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      500
+    );
+
+    // hardcoded final positions from my debug output
+    const TARGET_CAM_POS = new THREE.Vector3(0.857, 3.925, 4.559);
+    const TARGET_LOOK_AT = new THREE.Vector3(-0.131, 0.081, 0.738);
+
+    // pull back a bit for the intro dolly effect
+    camera.position.copy(TARGET_CAM_POS).multiplyScalar(1.15);
+
+    // setup renderer
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.6;
+    renderer.shadowMap.enabled = !isMobile;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    // orbit controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 2;
+    controls.maxDistance = 40;
+    controls.maxPolarAngle = Math.PI * 0.88;
+    controls.target.copy(TARGET_LOOK_AT);
+    controls.enabled = false;           // lock it down until intro is done
+    controls.update();
+
+    // lights
+    const USE_CUSTOM_LIGHTS = false; // toggle if we want custom lights or jsut blender exports
+    const GLB_LIGHT_INTENSITY = 0.0005;  // idk why exported lights are so strong, crushing them by a lot
+    const GLB_LIGHT_TINT = 0xFF8C00;      // tint to orange
+    const GLB_LIGHT_TINT_STRENGTH = 0.5; // 0 = no tint, 1 = max tint
+
+    if (USE_CUSTOM_LIGHTS) {
+      // fill
+      const ambient = new THREE.AmbientLight(0xd0c8ff, 0.6);
+      scene.add(ambient);
+
+      // key
+      const keyLight = new THREE.DirectionalLight(0xfff4e0, 2.2);
+      keyLight.position.set(6, 10, 5);
+      keyLight.castShadow = true;
+      keyLight.shadow.mapSize.set(2048, 2048);
+      keyLight.shadow.camera.near = 0.5;
+      keyLight.shadow.camera.far = 40;
+      keyLight.shadow.camera.left = -15;
+      keyLight.shadow.camera.right = 15;
+      keyLight.shadow.camera.top = 15;
+      keyLight.shadow.camera.bottom = -15;
+      keyLight.shadow.bias = -0.0005;
+      scene.add(keyLight);
+
+      // cool fill
+      const fillLight = new THREE.DirectionalLight(0x9ab8e0, 0.8);
+      fillLight.position.set(-5, 4, -3);
+      scene.add(fillLight);
+
+      // rim
+      const rimLight = new THREE.DirectionalLight(0xc8a0ff, 0.4);
+      rimLight.position.set(-3, 6, -8);
+      scene.add(rimLight);
+
+      // bounce
+      const hemi = new THREE.HemisphereLight(0x2a2840, 0x0a0a10, 0.5);
+      scene.add(hemi);
+    }
+
+    // firefly particles
+    const SHOW_FIREFLIES = true;  // toggle fireflies on/off
+    const FIREFLY_COUNT = isMobile ? 120 : 400;
+    const FIREFLY_SPREAD = 5;       // spawn radius
+    const FIREFLY_HEIGHT_MIN = 0.2;
+    const FIREFLY_HEIGHT_MAX = 3.5;
+
+    // draw a glowing circle onto a canvas so we dont need an image asset
+    const ffCanvas = document.createElement('canvas');
+    ffCanvas.width = 32; ffCanvas.height = 32;
+    const ffCtx = ffCanvas.getContext('2d');
+    const grad = ffCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grad.addColorStop(0, 'rgba(255, 210, 80, 1.0)');
+    grad.addColorStop(0.3, 'rgba(255, 190, 50, 0.6)');
+    grad.addColorStop(1, 'rgba(255, 160, 20, 0.0)');
+    ffCtx.fillStyle = grad;
+    ffCtx.fillRect(0, 0, 32, 32);
+    const ffTexture = new THREE.CanvasTexture(ffCanvas);
+
+    // prealloc arrays for performance
+    const ffPositions = new Float32Array(FIREFLY_COUNT * 3);
+    const ffPhases = new Float32Array(FIREFLY_COUNT);     // phase
+    const ffSpeeds = new Float32Array(FIREFLY_COUNT);     // drift
+    const ffBaseY = new Float32Array(FIREFLY_COUNT);      // height base
+    const ffRadii = new Float32Array(FIREFLY_COUNT);      // radius
+
+    for (let i = 0; i < FIREFLY_COUNT; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * FIREFLY_SPREAD;
+      ffPositions[i * 3] = Math.cos(angle) * r;
+      ffPositions[i * 3 + 1] = FIREFLY_HEIGHT_MIN + Math.random() * (FIREFLY_HEIGHT_MAX - FIREFLY_HEIGHT_MIN);
+      ffPositions[i * 3 + 2] = Math.sin(angle) * r;
+      ffPhases[i] = Math.random() * Math.PI * 2;
+      ffSpeeds[i] = 0.3 + Math.random() * 0.7;
+      ffBaseY[i] = ffPositions[i * 3 + 1];
+      ffRadii[i] = 0.15 + Math.random() * 0.4;
+    }
+
+    const ffGeo = new THREE.BufferGeometry();
+    ffGeo.setAttribute('position', new THREE.BufferAttribute(ffPositions, 3));
+
+    const ffMat = new THREE.PointsMaterial({
+      map: ffTexture,
+      size: 0.12,
+      transparent: true,
+      opacity: 0.7,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+
+    const fireflies = new THREE.Points(ffGeo, ffMat);
+    if (SHOW_FIREFLIES) scene.add(fireflies);
+
+    // tick fireflies
+    function updateFireflies(elapsed) {
+      const pos = ffGeo.attributes.position.array;
+      for (let i = 0; i < FIREFLY_COUNT; i++) {
+        const phase = ffPhases[i];
+        const speed = ffSpeeds[i];
+        const t = elapsed * speed + phase;
+        // sway
+        pos[i * 3] += Math.sin(t * 0.8) * 0.002;
+        pos[i * 3 + 1] = ffBaseY[i] + Math.sin(t * 0.5) * 0.3;
+        pos[i * 3 + 2] += Math.cos(t * 0.6) * 0.002;
+      }
+      ffGeo.attributes.position.needsUpdate = true;
+      // kinda hacky but gives it a global flicker
+      ffMat.opacity = 0.5 + Math.sin(elapsed * 1.5) * 0.2;
+    }
+
+    // downscale textures so it doesnt crash mobile browsers bc the glb is huge
+    const MAX_TEX = isMobile ? 1024 : 2048;
+    const TEX_KEYS = [
+      'map', 'normalMap', 'roughnessMap', 'metalnessMap',
+      'aoMap', 'emissiveMap', 'bumpMap', 'alphaMap', 'lightMap'
+    ];
+
+    function shrinkTexture(tex) {
+      const img = tex.image;
+      if (!img || !img.width || !img.height) return;
+      if (img.width <= MAX_TEX && img.height <= MAX_TEX) return;
+
+      const ratio = img.width / img.height;
+      let w, h;
+      if (img.width >= img.height) { w = MAX_TEX; h = Math.round(MAX_TEX / ratio); }
+      else { h = MAX_TEX; w = Math.round(MAX_TEX * ratio); }
+
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      tex.image = c;
+      tex.needsUpdate = true;
+    }
+
+    function shrinkAllTextures(root) {
+      const seen = new Set();
+      root.traverse(child => {
+        if (!child.isMesh || !child.material) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const m of mats) {
+          for (const k of TEX_KEYS) {
+            const t = m[k];
+            if (t && !seen.has(t.uuid)) { seen.add(t.uuid); shrinkTexture(t); }
+          }
+        }
+      });
+    }
+
+    // load the giant model
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(dracoLoader);
+
+    gltfLoader.load(
+      'https://assets.ningye.ca/Room_optimized.glb',
+      (gltf) => {
+        const model = gltf.scene;
+
+        // crunch textures
+        shrinkAllTextures(model);
+
+        // force shadows on everything, kinda expensive but looks better
+        model.traverse(child => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+          if (child.isLight) {
+            child.intensity *= GLB_LIGHT_INTENSITY;
+            child.color.lerp(new THREE.Color(GLB_LIGHT_TINT), GLB_LIGHT_TINT_STRENGTH);
+          }
+        });
+
+        scene.add(model);
+
+
+
+        // fade out loader
+        progressFill.style.width = '100%';
+        percentEl.textContent = '100 %';
+
+        setTimeout(() => {
+          loaderEl.classList.add('hidden');
+          beginIntroAnimation();
+        }, 600);
+      },
+      (progress) => {
+        if (progress.total > 0) {
+          const pct = Math.min((progress.loaded / progress.total) * 100, 99);
+          progressFill.style.width = pct + '%';
+          percentEl.textContent = Math.round(pct) + ' %';
+        }
+      },
+      (err) => {
+        console.error('GLB load error:', err);
+        percentEl.textContent = 'Load failed gg';
+        document.querySelector('.loader-sigil').style.display = 'none';
+      }
+    );
+
+    // ─── Intro camera dolly ───
+    let introActive = false;
+    let introT = 0;
+    const INTRO_DURATION = 2.4; // seconds
+
+    function beginIntroAnimation() {
+      introActive = true;
+      introT = 0;
+
+      // let them skip the intro if they click right away
+      attachSweepListener();
+
+      // show hints/tap prompt after intro
+      setTimeout(() => {
+        if (!sweepActive && !window.__fireBurnActive) {
+          if (isMobile) {
+            document.getElementById('tap-prompt').classList.add('visible');
+          } else {
+            hintsEl.classList.add('visible');
+          }
+        }
+      }, INTRO_DURATION * 1000 + 400);
+    }
+
+    // konami code for devmode
+    const FORCE_DEV_MODE = false; // set to true when debugging so u dont have to type it out every time
+    window.__devMode = FORCE_DEV_MODE;
+    if (window.__devMode) {
+      document.body.classList.add('dev-mode');
+    }
+
+    let konamiBuffer = '';
+    const konamiSequence = 'atlearia';
+
+    window.addEventListener('keydown', (e) => {
+      // buffer
+      konamiBuffer += e.key.toLowerCase();
+      if (konamiBuffer.length > konamiSequence.length) {
+        konamiBuffer = konamiBuffer.substring(konamiBuffer.length - konamiSequence.length);
+      }
+
+      if (konamiBuffer === konamiSequence) {
+        window.__devMode = !window.__devMode;
+        if (window.__devMode) {
+          document.body.classList.add('dev-mode');
+          controls.enabled = true;
+          hintsEl.classList.add('visible');
+          hintsEl.style.display = 'flex';
+        } else {
+          document.body.classList.remove('dev-mode');
+          controls.enabled = false;
+          hintsEl.classList.remove('visible');
+          hintsEl.style.display = 'none';
+        }
+        konamiBuffer = ''; // reset buffer
+      }
+    });
+
+    // ── WASD fly controls (dev mode only) ──
+    const moveKeys = {};
+    const MOVE_SPEED = 2.0;      // units per second
+    const _moveDir = new THREE.Vector3();
+    const _sideDir = new THREE.Vector3();
+    const _camDir = new THREE.Vector3();
+
+    window.addEventListener('keydown', (e) => {
+      if (!window.__devMode) return;
+      moveKeys[e.key.toLowerCase()] = true;
+      if (['w','a','s','d','q','e',' '].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      moveKeys[e.key.toLowerCase()] = false;
+    });
+
+    function applyWASD(delta) {
+      if (!window.__devMode) return;
+
+      // direction camera is facing (flatten Y for horizontal)
+      camera.getWorldDirection(_camDir);
+      _camDir.y = 0;
+      _camDir.normalize();
+
+      // strafe direction (perpendicular)
+      _sideDir.crossVectors(camera.up, _camDir).normalize();
+
+      const speed = MOVE_SPEED * delta;
+      _moveDir.set(0, 0, 0);
+
+      if (moveKeys['w']) _moveDir.add(_camDir.clone().multiplyScalar(speed));
+      if (moveKeys['s']) _moveDir.add(_camDir.clone().multiplyScalar(-speed));
+      if (moveKeys['a']) _moveDir.add(_sideDir.clone().multiplyScalar(speed));
+      if (moveKeys['d']) _moveDir.add(_sideDir.clone().multiplyScalar(-speed));
+      if (moveKeys['shift'] || moveKeys['q']) _moveDir.y -= speed;
+      if (moveKeys[' '] || moveKeys['e']) _moveDir.y += speed;
+
+      if (_moveDir.lengthSq() > 0) {
+        camera.position.add(_moveDir);
+        controls.target.add(_moveDir);
+      }
+    }
+
+    // standard cubic ease
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+    // intro cam
+    const INTRO_START = TARGET_CAM_POS.clone().multiplyScalar(1.15);
+
+    // sweep vars
+    const SWEEP_CAM_POS = new THREE.Vector3(-0.037, 2.121, 1.028);
+    const SWEEP_TARGET = new THREE.Vector3(-0.037, 0.121, 1.028);
+    const SWEEP_DURATION = 3.0; // seconds
+
+    let sweepActive = false;
+    let sweepT = 0;
+    let sweepStartPos = new THREE.Vector3();
+    let sweepStartTarget = new THREE.Vector3();
+    let sweepTriggered = false;
+
+    // better easing curve, stole this from easing.net
+    function easeInOutQuart(t) {
+      return t < 0.5
+        ? 8 * t * t * t * t
+        : 1 - Math.pow(-2 * t + 2, 4) / 2;
+    }
+
+    function beginSweep() {
+      if (sweepTriggered) return;
+      sweepTriggered = true;
+
+      // hide tap prompt
+      const tapPrompt = document.getElementById('tap-prompt');
+      if (tapPrompt) tapPrompt.classList.remove('visible');
+
+      // snapshot current state so we can lerp from it
+      sweepStartPos.copy(camera.position);
+      sweepStartTarget.copy(controls.target);
+
+      sweepActive = true;
+      sweepT = 0;
+      controls.enabled = false;
+
+      // trigger fadein early so it feels seamless
+      setTimeout(() => {
+        document.getElementById('coming-soon').classList.add('visible');
+      }, 2500);
+    }
+
+    // attach listeners
+    function attachSweepListener() {
+      const trigger = () => {
+        beginSweep();
+        window.removeEventListener('click', trigger);
+        window.removeEventListener('touchstart', trigger);
+        window.removeEventListener('keydown', trigger);
+      };
+      window.addEventListener('click', trigger, { once: true });
+      window.addEventListener('touchstart', trigger, { once: true });
+      window.addEventListener('keydown', trigger, { once: true });
+    }
+
+    // main loop
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+
+      // intro
+      if (introActive) {
+        introT += delta / INTRO_DURATION;
+        if (introT >= 1) {
+          introT = 1;
+          introActive = false;
+          controls.enabled = window.__devMode;
+        }
+        const t = easeOutCubic(Math.min(introT, 1));
+        camera.position.lerpVectors(INTRO_START, TARGET_CAM_POS, t);
+        camera.lookAt(TARGET_LOOK_AT);
+        controls.target.copy(TARGET_LOOK_AT);
+      }
+
+      // sweep
+      if (sweepActive) {
+        sweepT += delta / SWEEP_DURATION;
+        const t = easeInOutQuart(Math.min(sweepT, 1));
+        camera.position.lerpVectors(sweepStartPos, SWEEP_CAM_POS, t);
+        controls.target.lerpVectors(sweepStartTarget, SWEEP_TARGET, t);
+        camera.lookAt(controls.target);
+        // orbitcontrols forces 0 roll so we gotta smooth it out or it snaps rly bad
+        camera.rotation.z *= (1 - t);
+
+        if (sweepT >= 1) {
+          sweepT = 1;
+          sweepActive = false;
+          // lock pos
+          camera.position.copy(SWEEP_CAM_POS);
+          controls.target.copy(SWEEP_TARGET);
+          camera.lookAt(SWEEP_TARGET);
+          controls.update();
+          controls.enabled = window.__devMode;
+        }
+      }
+
+      // dont let orbit override animation
+      if (!introActive && !sweepActive) {
+        applyWASD(delta);
+        controls.update();
+      }
+
+      // woooo fireflies
+      if (SHOW_FIREFLIES) updateFireflies(clock.elapsedTime);
+
+      renderer.render(scene, camera);
+
+      // debug prints
+      const cp = camera.position;
+      const ct = controls.target;
+      const rot = camera.rotation;
+      const toDeg = THREE.MathUtils.radToDeg;
+      document.getElementById('debug-coords').textContent =
+        `cam pos:  (${cp.x.toFixed(3)}, ${cp.y.toFixed(3)}, ${cp.z.toFixed(3)})\n` +
+        `target:   (${ct.x.toFixed(3)}, ${ct.y.toFixed(3)}, ${ct.z.toFixed(3)})\n` +
+        `rot:      (${toDeg(rot.x).toFixed(1)}°, ${toDeg(rot.y).toFixed(1)}°, ${toDeg(rot.z).toFixed(1)}°)`;
+
+      // recorder hack
+      if (window.__recording) {
+        const ms = (performance.now() - window.__recStart).toFixed(1);
+        window.__recLog.push(
+          `${ms}ms | pos(${cp.x.toFixed(4)}, ${cp.y.toFixed(4)}, ${cp.z.toFixed(4)}) ` +
+          `tgt(${ct.x.toFixed(4)}, ${ct.y.toFixed(4)}, ${ct.z.toFixed(4)}) ` +
+          `rot(${toDeg(rot.x).toFixed(2)}°, ${toDeg(rot.y).toFixed(2)}°, ${toDeg(rot.z).toFixed(2)}°) ` +
+          `intro=${introActive} sweep=${sweepActive} sweepT=${sweepT.toFixed(4)}`
+        );
+      }
+    }
+    animate();
+
+    // resize handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // catch context loss so it doesnt just die silently
+    renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('WebGL context lost');
+    });
+    renderer.domElement.addEventListener('webglcontextrestored', () => {
+      console.log('WebGL context restored');
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,27 @@
+# Large assets (served from Cloudflare R2)
+Room.glb
+Room_optimized.glb 
+#dont even need R2 for optimized but why not at this point lol
+
+# Dev/benchmark pages — not for production
+ab_test.html
+benchmark.html
+compare.html
+controlled_test.html
+
+# Internal docs and screenshots
+performanceTrialV1.md
+performanceTrialV2.md
+Benchmark_200kVS1.4MFaces.png
+benchmark_trial1.png
+benchmark_trial2.png
+TrialResultV2.png
+
+# Alternative models (not used in production)
+Meshy_AI_Arboreal_Library_0404050326_texture.glb
+meshy2.glb
+
+# Node dependencies (index.html uses CDN imports, not local node_modules)
+node_modules/
+package.json
+package-lock.json
