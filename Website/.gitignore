@@ -1,6 +1,7 @@
 # Large assets (served from Cloudflare R2)
 Room.glb
 Room_optimized.glb 
+assets/
 #dont even need R2 for optimized but why not at this point lol
 
 # Dev/benchmark pages — not for production
