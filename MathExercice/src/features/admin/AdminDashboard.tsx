@@ -25,7 +25,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'byIp' | 'attempts'>('overview');
   
-  // IP detail modal state
+
   const [selectedIp, setSelectedIp] = useState<string | null>(null);
   const [ipDetails, setIpDetails] = useState<AdminSessionsByIp | null>(null);
   const [ipLoading, setIpLoading] = useState(false);
@@ -60,8 +60,8 @@ export default function AdminDashboard() {
     try {
       const data = await fetchAdminSessionsByIp(ip, adminKey || undefined);
       setIpDetails(data);
-    } catch (err) {
-      console.error('Failed to load IP details:', err);
+    } catch {
+      // silently fail — modal just stays empty
     } finally {
       setIpLoading(false);
     }
@@ -72,7 +72,7 @@ export default function AdminDashboard() {
     setIpDetails(null);
   };
 
-  // Only auto-load when adminKey is set (e.g. from sessionStorage)
+
   useEffect(() => {
     if (adminKey) loadData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -331,7 +331,7 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* IP Detail Modal */}
+
       {selectedIp && (
         <div className="admin-modal-overlay" onClick={closeModal}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
@@ -354,7 +354,7 @@ export default function AdminDashboard() {
 
             {ipDetails && (
               <div className="admin-modal-content">
-                {/* Aggregate Stats */}
+
                 <div className="admin-ip-stats">
                   <div className="admin-ip-stat">
                     <span className="admin-ip-stat-icon">📋</span>
@@ -378,7 +378,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Improvement Trend */}
+
                 {ipDetails.improvementTrend && (
                   <div className="admin-improvement-card">
                     <h3>Improvement Analysis</h3>
@@ -410,7 +410,7 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* Session History Chart */}
+
                 {ipDetails.sessions.length > 0 && (
                   <div className="admin-sessions-chart">
                     <h3>Session Performance</h3>
@@ -442,7 +442,7 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* Session Cards */}
+
                 <div className="admin-sessions-list">
                   <h3>All Sessions</h3>
                   {[...ipDetails.sessions].reverse().map((s, i) => {

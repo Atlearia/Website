@@ -7,13 +7,13 @@ const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   max: 10,
   idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 5_000,       // fail fast if DB is down
-  keepAlive: true,                       // TCP keepalive prevents idle drops
+  connectionTimeoutMillis: 5_000,
+  keepAlive: true,
   keepAliveInitialDelayMillis: 10_000,
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected PG pool error:', err);
+  console.error('PG pool error:', err);
 });
 
 export default pool;

@@ -15,11 +15,8 @@ export default function PracticeScreen() {
     setSoundOn, setGoal, setMulFocus, setDifficulty, grantConsent, revokeConsent,
   } = usePracticeState();
 
-  // null = hasn't decided yet, true/false = decided
   const [consentShown, setConsentShown] = useState(!hasConsent && hasConsent !== false);
 
-  // show consent gate if user hasnt made a choice yet
-  // hasConsent is null on first visit
   if (hasConsent === null) {
     return (
       <main className="app-container fade-in">
@@ -62,7 +59,7 @@ export default function PracticeScreen() {
 
         <div className="main-layout">
           <div className="game-area">
-            {/* equation + input */}
+
             <div className="card-side">
               {completed ? (
                 <div className="celebration">
@@ -86,7 +83,7 @@ export default function PracticeScreen() {
               </div>
             </div>
 
-            {/* progress ring */}
+
             <Meter correct={correct} total={goal} />
           </div>
         </div>

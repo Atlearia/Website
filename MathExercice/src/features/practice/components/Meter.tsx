@@ -5,14 +5,14 @@ interface MeterProps {
   total: number;
 }
 
-// circular progress ring, floats in top-right corner of the game card
+
 const Meter = memo(function Meter({ correct, total }: MeterProps) {
   const pct = Math.min((correct / total) * 100, 100);
   const done = pct >= 100;
 
-  // svg circle math
+
   const size = 84;
-  const sw = 7; // stroke width
+  const sw = 7;
   const r = (size - sw) / 2;
   const circ = r * 2 * Math.PI;
   const offset = circ - (pct / 100) * circ;

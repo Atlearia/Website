@@ -6,9 +6,9 @@ services:
     container_name: mathpractice-pg
     restart: unless-stopped
     environment:
-      POSTGRES_USER: mathuser
-      POSTGRES_PASSWORD: mathpass
-      POSTGRES_DB: mathpractice
+      POSTGRES_USER: ${PG_USER:-mathuser}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_DB:-mathpractice}
     ports:
       - "5432:5432"
     volumes:

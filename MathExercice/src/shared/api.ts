@@ -1,8 +1,4 @@
-// ── API client for math-practice backend ────────────────────────────
-
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
-
-// ── Types ────────────────────────────────────────────────────────────
 
 export interface AttemptPayload {
   userId: string;
@@ -29,8 +25,6 @@ export interface ProgressData {
   }[];
 }
 
-// ── Register anonymous user ──────────────────────────────────────────
-
 export async function registerAnon(userId: string): Promise<string> {
   const res = await fetch(`${API_BASE}/register-anon`, {
     method: 'POST',
@@ -42,28 +36,19 @@ export async function registerAnon(userId: string): Promise<string> {
   return data.userId;
 }
 
-// ── Submit attempt (fire-and-forget) ─────────────────────────────────
-
 export function submitAttempt(payload: AttemptPayload): void {
-  // Fire-and-forget — don't await. Log errors silently.
   fetch(`${API_BASE}/attempt`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  }).catch((err) => {
-    console.warn('[api] attempt submission failed:', err);
-  });
+  }).catch(() => {});
 }
-
-// ── Fetch progress ──────────────────────────────────────────────────
 
 export async function fetchProgress(userId: string): Promise<ProgressData> {
   const res = await fetch(`${API_BASE}/progress?userId=${encodeURIComponent(userId)}`);
   if (!res.ok) throw new Error(`progress fetch failed: ${res.status}`);
   return res.json();
 }
-
-// ── Session tracking ────────────────────────────────────────────────
 
 export async function startSession(userId: string): Promise<number> {
   const res = await fetch(`${API_BASE}/session/start`, {
@@ -77,14 +62,12 @@ export async function startSession(userId: string): Promise<number> {
 }
 
 export function endSession(sessionId: number, attempts: number, correct: number, totalTimeMs: number): void {
-  // Use sendBeacon for reliability when page is closing
   const data = JSON.stringify({ sessionId, attempts, correct, totalTimeMs });
   const blob = new Blob([data], { type: 'application/json' });
 
   if (navigator.sendBeacon) {
     navigator.sendBeacon(`${API_BASE}/session/end`, blob);
   } else {
-    // Fallback: fire-and-forget fetch
     fetch(`${API_BASE}/session/end`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -95,17 +78,14 @@ export function endSession(sessionId: number, attempts: number, correct: number,
 }
 
 export function updateSession(sessionId: number, attempts: number, correct: number, totalTimeMs: number): void {
-  // Fire-and-forget update
   fetch(`${API_BASE}/session/update`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId, attempts, correct, totalTimeMs }),
-  }).catch((err) => {
-    console.warn('[api] session update failed:', err);
-  });
+  }).catch(() => {});
 }
 
-// ── Admin API types ─────────────────────────────────────────────────
+// admin types
 
 export interface AdminStats {
   totalUsers: number;
@@ -195,9 +175,6 @@ export interface AdminSessionsByIp {
   sessions: AdminSession[];
 }
 
-// ── Admin API functions ─────────────────────────────────────────────
-
-/** Build headers for admin requests (Authorization: Bearer <key>). */
 function adminHeaders(key?: string): HeadersInit {
   const h: Record<string, string> = {};
   if (key) h['Authorization'] = `Bearer ${key}`;
@@ -244,7 +221,7 @@ export async function fetchAdminSessionsByIp(ipHash: string, key?: string): Prom
   return res.json();
 }
 
-export async function deleteAdminUser(userId: string, key?: string): Promise<{ ok: boolean; deletedUserId: string }> {
+export async function deleteAdminUser(userId: string, key?: string): Promise<{ ok: boolean }> {
   const res = await fetch(`${API_BASE}/admin/user/${encodeURIComponent(userId)}`, {
     method: 'DELETE',
     headers: adminHeaders(key),

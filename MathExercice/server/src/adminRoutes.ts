@@ -5,13 +5,7 @@ import { isValidUUID } from './validation.js';
 
 const router = Router();
 
-// ═══════════════════════════════════════════════════════════════════
-// Admin auth middleware — ADMIN_KEY env var is REQUIRED.
-// Auth is accepted ONLY via Authorization: Bearer <key> header.
-// Query-string keys are NOT supported (prevents secret leakage in
-// logs, browser history, and referrer headers).
-// Uses constant-time comparison to prevent timing attacks.
-// ═══════════════════════════════════════════════════════════════════
+// constant-time string comparison to avoid timing side channels
 function safeCompare(a: string, b: string): boolean {
   if (a.length !== b.length) {
     const padded = a.padEnd(b.length, '\0');
@@ -23,30 +17,24 @@ function safeCompare(a: string, b: string): boolean {
   return timingSafeEqual(Buffer.from(a, 'utf-8'), Buffer.from(b, 'utf-8'));
 }
 
+// admin auth — requires ADMIN_KEY env, bearer token only (no query strings)
 const adminAuth = (req: Request, res: Response, next: NextFunction): void => {
   const adminKey = process.env.ADMIN_KEY;
 
-  // If ADMIN_KEY is not configured, refuse to serve admin routes.
   if (!adminKey) {
-    console.warn('[admin] ADMIN_KEY is not set — admin routes are disabled.');
-    res.status(503).json({
-      error: 'Admin interface is unavailable. ADMIN_KEY must be configured on the server.',
-    });
+    res.status(503).json({ error: 'Admin unavailable.' });
     return;
   }
 
-  // Only accept credentials via Authorization header (Bearer scheme).
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.warn(`[admin] Denied: missing or malformed Authorization header (${req.method} ${req.path})`);
-    res.status(401).json({ error: 'Unauthorized. Provide admin key via Authorization: Bearer <key> header.' });
+    res.status(401).json({ error: 'Unauthorized.' });
     return;
   }
 
-  const token = authHeader.slice(7); // len('Bearer ') === 7
+  const token = authHeader.slice(7);
   if (!safeCompare(token, adminKey)) {
-    console.warn(`[admin] Denied: invalid admin key (${req.method} ${req.path})`);
-    res.status(401).json({ error: 'Unauthorized. Invalid admin key.' });
+    res.status(401).json({ error: 'Unauthorized.' });
     return;
   }
 
@@ -55,10 +43,7 @@ const adminAuth = (req: Request, res: Response, next: NextFunction): void => {
 
 router.use(adminAuth);
 
-// ═══════════════════════════════════════════════════════════════════
 // GET /api/admin/stats
-// Global aggregate statistics
-// ═══════════════════════════════════════════════════════════════════
 router.get('/stats', async (_req: Request, res: Response) => {
   try {
     const stats = await pool.query(`
@@ -95,10 +80,7 @@ router.get('/stats', async (_req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
 // GET /api/admin/users
-// List all users with their stats
-// ═══════════════════════════════════════════════════════════════════
 router.get('/users', async (req: Request, res: Response) => {
   const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
   const offset = parseInt(req.query.offset as string) || 0;
@@ -149,10 +131,7 @@ router.get('/users', async (req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// GET /api/admin/users-by-ip
-// Group users by IP address to identify unique real users
-// ═══════════════════════════════════════════════════════════════════
+// GET /api/admin/users-by-ip — group users by ip hash
 router.get('/users-by-ip', async (req: Request, res: Response) => {
   const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
   const offset = parseInt(req.query.offset as string) || 0;
@@ -204,10 +183,7 @@ router.get('/users-by-ip', async (req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// GET /api/admin/attempts
-// Recent attempts across all users
-// ═══════════════════════════════════════════════════════════════════
+// GET /api/admin/attempts — recent attempts across all users
 router.get('/attempts', async (req: Request, res: Response) => {
   const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
   const offset = parseInt(req.query.offset as string) || 0;
@@ -249,10 +225,7 @@ router.get('/attempts', async (req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// GET /api/admin/daily
-// Daily aggregates for the last 30 days
-// ═══════════════════════════════════════════════════════════════════
+// GET /api/admin/daily — last 30 days aggregated
 router.get('/daily', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(`
@@ -290,21 +263,17 @@ router.get('/daily', async (_req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// GET /api/admin/sessions-by-ip?ip=<ip_hash_prefix_or_full>
-// Get all sessions for a specific ip_hash to track improvement.
-// Accepts the full ip_hash or the 12-char prefix shown in the UI.
-// ═══════════════════════════════════════════════════════════════════
+// GET /api/admin/sessions-by-ip?ip=<hash or 12-char prefix>
 router.get('/sessions-by-ip', async (req: Request, res: Response) => {
   const ipHashParam = req.query.ip as string;
   
   if (!ipHashParam) {
-    res.status(400).json({ error: 'ip query param is required (ip_hash or prefix)' });
+    res.status(400).json({ error: 'ip query param required' });
     return;
   }
 
   try {
-    // Get all user IDs associated with this ip_hash (exact or prefix match)
+    // find users by exact or prefix match on ip_hash
     const usersResult = await pool.query(
       `SELECT id FROM users WHERE ip_hash = $1 OR ip_hash LIKE $2`,
       [ipHashParam, `${ipHashParam}%`],
@@ -321,15 +290,12 @@ router.get('/sessions-by-ip', async (req: Request, res: Response) => {
       return;
     }
 
-    // Resolve the full ip_hash for display
     const fullHashResult = await pool.query(
       `SELECT ip_hash FROM users WHERE id = $1`, [userIds[0]],
     );
     const fullIpHash = fullHashResult.rows[0]?.ip_hash || ipHashParam;
 
-    // Compute sessions by joining attempts into session windows.
-    // Use user_id matching (not ip_hash) to avoid hash mismatches
-    // between users and sessions tables.
+    // join attempts into session windows
     const sessionsResult = await pool.query(`
       WITH session_windows AS (
         SELECT
@@ -383,8 +349,8 @@ router.get('/sessions-by-ip', async (req: Request, res: Response) => {
 
     let sessions = sessionsResult.rows;
 
-    // If there are no sessions at all but there ARE attempts,
-    // build "virtual sessions" by grouping attempts with >30 min gaps.
+    // fallback: if no session rows exist but attempts do,
+    // group attempts into virtual sessions split at 30min gaps
     if (sessions.length === 0) {
       const virtualResult = await pool.query(`
         WITH ordered AS (
@@ -425,7 +391,6 @@ router.get('/sessions-by-ip', async (req: Request, res: Response) => {
       sessions = virtualResult.rows;
     }
 
-    // Compute aggregates
     const totalSessions = sessions.length;
     const totalAttempts = sessions.reduce((s, r) => s + r.attempts, 0);
     const totalCorrect = sessions.reduce((s, r) => s + r.correct, 0);
@@ -433,13 +398,12 @@ router.get('/sessions-by-ip', async (req: Request, res: Response) => {
     const firstSeen = sessions.length > 0 ? sessions[sessions.length - 1].started_at : null;
     const lastSeen = sessions.length > 0 ? (sessions[0].ended_at || sessions[0].started_at) : null;
 
-    // Calculate improvement trend (compare first half vs second half)
+    // compare first half vs second half of sessions for trend
     let improvementTrend = null;
     const sessionsWithAttempts = sessions.filter(s => s.attempts > 0);
     
     if (sessionsWithAttempts.length >= 4) {
       const midpoint = Math.floor(sessionsWithAttempts.length / 2);
-      // sessions are DESC, so recent = first half, earlier = second half
       const recentSessions = sessionsWithAttempts.slice(0, midpoint);
       const earlierSessions = sessionsWithAttempts.slice(midpoint);
       
@@ -493,12 +457,7 @@ router.get('/sessions-by-ip', async (req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// DELETE /api/admin/user/:userId
-// Delete an anonymous user and all their data (for compliance/GDPR
-// requests). Deletes sessions + attempts (via ON DELETE CASCADE)
-// then the user row itself.
-// ═══════════════════════════════════════════════════════════════════
+// DELETE /api/admin/user/:userId — wipe a user and all their data (cascade)
 router.delete('/user/:userId', async (req: Request, res: Response) => {
   const { userId } = req.params;
 
@@ -508,7 +467,6 @@ router.delete('/user/:userId', async (req: Request, res: Response) => {
   }
 
   try {
-    // CASCADE will remove attempts + sessions automatically
     const result = await pool.query('DELETE FROM users WHERE id = $1', [userId]);
 
     if (result.rowCount === 0) {
@@ -516,8 +474,7 @@ router.delete('/user/:userId', async (req: Request, res: Response) => {
       return;
     }
 
-    console.log(`[admin] Deleted user ${userId} and associated data`);
-    res.json({ ok: true, deletedUserId: userId });
+    res.json({ ok: true });
   } catch (err) {
     console.error('admin/delete-user error:', err);
     res.status(500).json({ error: 'Internal server error' });

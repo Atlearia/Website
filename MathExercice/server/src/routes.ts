@@ -6,14 +6,10 @@ import { getHashedClientIp } from './ipHash.js';
 
 const router = Router();
 
-// ═══════════════════════════════════════════════════════════════════
 // POST /api/register-anon
-// Creates a new anonymous user and returns { userId }.
-// If a userId is sent and already exists, returns it (idempotent).
-// ═══════════════════════════════════════════════════════════════════
+// creates or re-registers an anonymous user, returns { userId }
 router.post('/register-anon', async (req: Request, res: Response) => {
   try {
-    // Accept client-generated UUID, or generate one server-side as fallback
     const body = req.body as Record<string, unknown> | undefined;
     const id = (body?.userId && isValidUUID(body.userId)) ? body.userId : uuidv4();
     const ipHash = getHashedClientIp(req);
@@ -30,10 +26,7 @@ router.post('/register-anon', async (req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// POST /api/attempt
-// Records one problem attempt.
-// ═══════════════════════════════════════════════════════════════════
+// POST /api/attempt — records one problem attempt
 router.post('/attempt', async (req: Request, res: Response) => {
   const { data, errors } = validateAttempt(req.body);
   if (errors) {
@@ -42,17 +35,14 @@ router.post('/attempt', async (req: Request, res: Response) => {
   }
 
   try {
-    // Ensure user exists (upsert last_seen)
     const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [data!.userId]);
     if (userCheck.rowCount === 0) {
       res.status(404).json({ error: 'User not found. Call /api/register-anon first.' });
       return;
     }
 
-    // Update last_seen
     await pool.query('UPDATE users SET last_seen = now() WHERE id = $1', [data!.userId]);
 
-    // Insert attempt
     await pool.query(
       `INSERT INTO attempts (user_id, problem_type, difficulty, time_ms, correct, client_ts)
        VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -73,10 +63,7 @@ router.post('/attempt', async (req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// GET /api/progress?userId=...
-// Returns aggregate stats + daily trend (last 14 days).
-// ═══════════════════════════════════════════════════════════════════
+// GET /api/progress?userId=... — aggregate stats + 14 day trend
 router.get('/progress', async (req: Request, res: Response) => {
   const userId = req.query.userId as string;
   if (!isValidUUID(userId)) {
@@ -85,7 +72,6 @@ router.get('/progress', async (req: Request, res: Response) => {
   }
 
   try {
-    // ── Totals ──────────────────────────────────────────────────
     const totalsResult = await pool.query(
       `SELECT
          COUNT(*)::int                                          AS attempts,
@@ -101,7 +87,6 @@ router.get('/progress', async (req: Request, res: Response) => {
 
     const totals = totalsResult.rows[0] ?? { attempts: 0, correct_count: 0, accuracy: 0 };
 
-    // ── Median time (overall) ───────────────────────────────────
     const medianAllResult = await pool.query(
       `SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY time_ms)::int AS median
        FROM attempts WHERE user_id = $1`,
@@ -109,7 +94,6 @@ router.get('/progress', async (req: Request, res: Response) => {
     );
     const medianTimeMs = medianAllResult.rows[0]?.median ?? null;
 
-    // ── Median time (correct only) ──────────────────────────────
     const medianCorrectResult = await pool.query(
       `SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY time_ms)::int AS median
        FROM attempts WHERE user_id = $1 AND correct = true`,
@@ -117,7 +101,6 @@ router.get('/progress', async (req: Request, res: Response) => {
     );
     const medianCorrectTimeMs = medianCorrectResult.rows[0]?.median ?? null;
 
-    // ── Per-day breakdown (last 14 days) ─────────────────────────
     const perDayResult = await pool.query(
       `SELECT
          d.day::date                                            AS date,
@@ -161,11 +144,7 @@ router.get('/progress', async (req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// POST /api/session/start
-// Creates a new session when user opens the site.
-// Returns { sessionId }.
-// ═══════════════════════════════════════════════════════════════════
+// POST /api/session/start — open a new session, returns { sessionId }
 router.post('/session/start', async (req: Request, res: Response) => {
   try {
     const body = req.body as Record<string, unknown> | undefined;
@@ -178,7 +157,6 @@ router.post('/session/start', async (req: Request, res: Response) => {
 
     const ipHash = getHashedClientIp(req);
 
-    // Create a new session
     const result = await pool.query(
       `INSERT INTO sessions (user_id, ip_hash, started_at)
        VALUES ($1, $2, now())
@@ -193,10 +171,7 @@ router.post('/session/start', async (req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// POST /api/session/end
-// Ends a session with summary stats (called when user leaves).
-// ═══════════════════════════════════════════════════════════════════
+// POST /api/session/end — close a session with final stats
 router.post('/session/end', async (req: Request, res: Response) => {
   try {
     const body = req.body as Record<string, unknown> | undefined;
@@ -210,7 +185,6 @@ router.post('/session/end', async (req: Request, res: Response) => {
       return;
     }
 
-    // Update the session with end time and stats
     await pool.query(
       `UPDATE sessions 
        SET ended_at = now(),
@@ -228,10 +202,7 @@ router.post('/session/end', async (req: Request, res: Response) => {
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// POST /api/session/update
-// Updates session stats periodically (in case the user doesn't trigger end).
-// ═══════════════════════════════════════════════════════════════════
+// POST /api/session/update — periodic heartbeat with running stats
 router.post('/session/update', async (req: Request, res: Response) => {
   try {
     const body = req.body as Record<string, unknown> | undefined;
@@ -245,7 +216,6 @@ router.post('/session/update', async (req: Request, res: Response) => {
       return;
     }
 
-    // Update the session stats
     await pool.query(
       `UPDATE sessions 
        SET attempts = $2,

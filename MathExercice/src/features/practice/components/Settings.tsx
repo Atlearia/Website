@@ -32,7 +32,7 @@ export default function Settings({
 }: SettingsProps) {
   return (
     <div className="settings-bar">
-      {/* Mode buttons */}
+
       <div className="mode-group">
         {MODES.map((m) => (
           <button
@@ -46,7 +46,7 @@ export default function Settings({
         ))}
       </div>
 
-      {/* Digit difficulty */}
+
       <div className="goal-group">
         <span className="goal-label">Digits</span>
         <select
@@ -60,7 +60,7 @@ export default function Settings({
         </select>
       </div>
 
-      {/* Goal */}
+
       <div className="goal-group">
         <span className="goal-label">Goal</span>
         <select
@@ -74,7 +74,7 @@ export default function Settings({
         </select>
       </div>
 
-      {/* Multiply focus */}
+
       <div className="goal-group">
         <span className="goal-label">Focus</span>
         <select
@@ -109,7 +109,7 @@ export default function Settings({
   );
 }
 
-// reset w/ confirmation so ppl don't wipe progress on accident
+// wraps reset in a confirmation dialog
 function ResetButton({ onReset }: { onReset: () => void }) {
   const handleReset = () => {
     if (window.confirm('Reset all progress? This cannot be undone.')) {

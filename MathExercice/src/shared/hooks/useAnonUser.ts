@@ -3,11 +3,8 @@ import { registerAnon } from '../api';
 
 const STORAGE_KEY = 'anonUserId';
 
-/**
- * Manages an anonymous user UUID.
- * Only activates if `enabled` is true (consent given).
- * When disabled, returns null and doesnt touch localStorage or the backend.
- */
+// manages an anonymous UUID per browser tab.
+// only does anything when `enabled` is true (user gave consent).
 export function useAnonUser(enabled: boolean): string | null {
   const [userId, setUserId] = useState<string | null>(() => {
     if (!enabled) return null;
@@ -24,19 +21,15 @@ export function useAnonUser(enabled: boolean): string | null {
 
     if (existing) {
       setUserId(existing);
-      // update last_seen in the background
       registerAnon(existing).catch(() => {});
       return;
     }
 
-    // generate new UUID and register
     const id = crypto.randomUUID();
     localStorage.setItem(STORAGE_KEY, id);
     setUserId(id);
 
-    registerAnon(id).catch((err) => {
-      console.warn('[useAnonUser] registration failed, will retry:', err);
-    });
+    registerAnon(id).catch(() => {});
   }, [enabled]);
 
   return userId;

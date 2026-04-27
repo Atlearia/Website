@@ -1,8 +1,3 @@
--- ═══════════════════════════════════════════════════════════════════
--- Math Practice — Schema Migration
--- ═══════════════════════════════════════════════════════════════════
-
--- Users table
 CREATE TABLE IF NOT EXISTS users (
   id            UUID PRIMARY KEY,
   ip_hash       TEXT,
@@ -10,10 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
   last_seen     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Index for ip_hash-based lookups (privacy-preserving identity)
 CREATE INDEX IF NOT EXISTS idx_users_ip_hash ON users (ip_hash);
 
--- Attempts table
 CREATE TABLE IF NOT EXISTS attempts (
   id            BIGSERIAL PRIMARY KEY,
   user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -25,14 +18,12 @@ CREATE TABLE IF NOT EXISTS attempts (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_attempts_user_created
   ON attempts (user_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_attempts_user_type
   ON attempts (user_id, problem_type);
 
--- Sessions table (tracks each visit to the site)
 CREATE TABLE IF NOT EXISTS sessions (
   id            BIGSERIAL PRIMARY KEY,
   user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -44,12 +35,10 @@ CREATE TABLE IF NOT EXISTS sessions (
   total_time_ms BIGINT NOT NULL DEFAULT 0
 );
 
--- Index for session lookups
 CREATE INDEX IF NOT EXISTS idx_sessions_ip_hash ON sessions (ip_hash);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions (started_at);
 
--- Guestbook table (visitor messages from ningye.ca) hello :)
 CREATE TABLE IF NOT EXISTS guestbook (
   id          BIGSERIAL PRIMARY KEY,
   name        TEXT DEFAULT 'Anonymous',

@@ -12,19 +12,13 @@ import { runRetentionCleanup, scheduleRetentionCleanup } from './retention.js';
 
 dotenv.config();
 
-// ── Fail fast if required secrets are missing ────────────────────────
+// crash immediately if IP_HASH_KEY is missing
 ensureIpHashKey();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
-// ── Trust proxy ──────────────────────────────────────────────────────
-// TRUST_PROXY controls Express's trust-proxy setting for correct IP
-// extraction behind reverse proxies (e.g. nginx, Cloudflare, Render).
-//   '1'      → trust one proxy hop (safe default for single-proxy setups)
-//   'loopback' → trust only loopback addresses
-//   'true'   → trust ALL proxies (use ONLY if guaranteed behind a trusted proxy)
-// Default: 1 (single trusted hop). Adjust via TRUST_PROXY env var.
+// proxy trust — default 1 hop, override with TRUST_PROXY env
 const trustProxy = process.env.TRUST_PROXY ?? '1';
 app.set(
   'trust proxy',
@@ -34,7 +28,7 @@ app.set(
     : trustProxy,
 );
 
-// ── Security headers ─────────────────────────────────────────────────
+// security headers
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -48,12 +42,12 @@ app.use(helmet({
       frameAncestors: ["'none'"],
     },
   },
-  crossOriginEmbedderPolicy: false,  // needed for CORS API
+  crossOriginEmbedderPolicy: false,
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
 }));
 app.disable('x-powered-by');
 
-// ── CORS ─────────────────────────────────────────────────────────────
+// CORS
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
   .split(',')
   .map((s) => s.trim());
@@ -66,11 +60,9 @@ app.use(
   }),
 );
 
-// ── Body parsing ─────────────────────────────────────────────────────
 app.use(express.json({ limit: '16kb' }));
 
-// ── Rate limiting ────────────────────────────────────────────────────
-// General limiter: 100 requests per minute per IP
+// rate limits
 const generalLimiter = rateLimit({
   windowMs: 60_000,
   max: 100,
@@ -79,7 +71,6 @@ const generalLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 
-// Stricter limiter for attempt submission: 30 per minute per IP
 const attemptLimiter = rateLimit({
   windowMs: 60_000,
   max: 30,
@@ -88,7 +79,6 @@ const attemptLimiter = rateLimit({
   message: { error: 'Too many attempts submitted. Slow down!' },
 });
 
-// Registration limiter: 5 per minute per IP
 const registerLimiter = rateLimit({
   windowMs: 60_000,
   max: 5,
@@ -97,7 +87,6 @@ const registerLimiter = rateLimit({
   message: { error: 'Too many registrations. Try again later.' },
 });
 
-// Guestbook limiter: 3 messages per 10 minutes per IP
 const guestbookLimiter = rateLimit({
   windowMs: 10 * 60_000,
   max: 3,
@@ -110,35 +99,25 @@ app.use('/api', generalLimiter);
 app.use('/api/register-anon', registerLimiter);
 app.use('/api/attempt', attemptLimiter);
 
-// ── Routes ───────────────────────────────────────────────────────────
+// routes
 app.use('/api', apiRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/guestbook', guestbookLimiter, guestbookRouter);
 
-// ── Root route ────────────────────────────────────────────────────────
-app.get('/', (_req, res) => {
-  res.json({
-    name: 'Math Practice API',
-    status: 'running',
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// ── Health check ─────────────────────────────────────────────────────
+// health check
 app.get('/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok' });
   } catch {
-    res.status(503).json({ status: 'error', db: 'disconnected', timestamp: new Date().toISOString() });
+    res.status(503).json({ status: 'error' });
   }
 });
 
-// ── Start ────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`🚀 Math Practice API running on http://localhost:${PORT}`);
+  console.log(`Server listening on port ${PORT}`);
 
-  // Run retention cleanup once at startup, then schedule daily
+  // clean old data on boot, then daily
   runRetentionCleanup().catch((err: unknown) =>
     console.error('Initial retention cleanup failed:', err),
   );

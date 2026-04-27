@@ -38,7 +38,7 @@ export interface PracticeActions {
 }
 
 export function usePracticeState(): PracticeState & PracticeActions {
-  // consent state — null means user hasn't decided yet
+  // null = user hasn't decided on data consent yet
   const [consent, setConsent] = useState<boolean | null>(() => {
     const stored = localStorage.getItem('dataConsent');
     if (stored === 'true') return true;
@@ -46,13 +46,10 @@ export function usePracticeState(): PracticeState & PracticeActions {
     return null;
   });
 
-  // only init anon user if consent is granted
   const anonUserId = useAnonUser(consent === true);
-
-  // session tracking (only if consent given)
   const { recordAttempt } = useSession(consent === true ? anonUserId : null);
 
-  // persisted settings (these are just preferences, not user data)
+  // preferences (local only, not sent anywhere)
   const [correct, setCorrect] = useLocalStorage('mathCorrect', 0);
   const [mode, setMode] = useLocalStorage<Mode>('mathMode', 'mix');
   const [soundOn, setSoundOn] = useLocalStorage('mathSound', false);
@@ -60,15 +57,12 @@ export function usePracticeState(): PracticeState & PracticeActions {
   const [mulFocus, setMulFocus] = useLocalStorage<number | null>('mathMulFocus', null);
   const [difficulty, setDifficulty] = useLocalStorage<Difficulty>('mathDifficulty', '2d');
 
-  // ephemeral
   const [streak, setStreak] = useState(0);
   const [problem, setProblem] = useState(() => generateProblem(mode, mulFocus ?? undefined, difficulty));
   const [showConfetti, setShowConfetti] = useState(correct >= goal);
 
-  // timer for tracking how long each problem takes
   const problemShownAt = useRef<number>(Date.now());
 
-  // only send attempt data if user consented
   const sendAttempt = useCallback(
     (wasCorrect: boolean) => {
       if (consent !== true || !anonUserId) return;
@@ -138,7 +132,6 @@ export function usePracticeState(): PracticeState & PracticeActions {
 
   const revokeConsent = useCallback(() => {
     localStorage.setItem('dataConsent', 'false');
-    // also nuke the anon id so nothing is stored
     localStorage.removeItem('anonUserId');
     setConsent(false);
   }, []);

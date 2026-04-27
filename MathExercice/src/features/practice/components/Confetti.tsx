@@ -4,10 +4,7 @@ interface ConfettiProps {
   active: boolean;
 }
 
-/**
- * Lightweight canvas-based confetti burst. No external deps.
- * Renders ~80 coloured rectangles that fall and spin, then stops.
- */
+// canvas confetti burst, no deps
 export default function Confetti({ active }: ConfettiProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -58,13 +55,13 @@ export default function Confetti({ active }: ConfettiProps) {
       const elapsed = now - start;
       if (elapsed > 3500) {
         ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
-        return; // stop after ~3.5s
+        return;
       }
       ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
 
       for (const p of particles) {
         p.x += p.vx;
-        p.vy += 0.25; // gravity
+        p.vy += 0.25;
         p.y += p.vy;
         p.rot += p.vr;
         if (elapsed > 2500) p.opacity = Math.max(0, p.opacity - 0.03);

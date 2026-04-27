@@ -5,8 +5,7 @@ interface ConsentGateProps {
   onDecline: () => void;
 }
 
-// shown before any data collection begins
-// if user declines we dont store anything at all
+
 export default function ConsentGate({ onAccept, onDecline }: ConsentGateProps) {
   const [checked, setChecked] = useState(false);
 

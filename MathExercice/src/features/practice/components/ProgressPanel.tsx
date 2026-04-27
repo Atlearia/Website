@@ -20,13 +20,12 @@ export default function ProgressPanel({ userId }: ProgressPanelProps) {
       setData(d);
     } catch (err) {
       setError('Could not load progress');
-      console.warn('[ProgressPanel]', err);
     } finally {
       setLoading(false);
     }
   }, [userId]);
 
-  // fetch when panel opens
+
   useEffect(() => {
     if (open) load();
   }, [open, load]);

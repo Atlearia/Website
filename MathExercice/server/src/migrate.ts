@@ -14,9 +14,9 @@ async function migrate() {
   try {
     const sql = readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
     await pool.query(sql);
-    console.log('✅ Migration complete');
+    console.log('Migration complete');
   } catch (err) {
-    console.error('❌ Migration failed:', err);
+    console.error('Migration failed:', err);
     process.exit(1);
   } finally {
     await pool.end();

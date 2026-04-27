@@ -7,16 +7,13 @@ interface SessionStats {
   totalTimeMs: number;
 }
 
-/**
- * Custom hook to track user sessions.
- * Starts a session when mounted, updates periodically, and ends on page close.
- */
+// tracks a session lifecycle: start on mount, heartbeat every 15s,
+// end on tab close or visibility change.
 export function useSession(userId: string | null) {
   const sessionIdRef = useRef<number | null>(null);
   const statsRef = useRef<SessionStats>({ attempts: 0, correct: 0, totalTimeMs: 0 });
   const isInitialized = useRef(false);
 
-  // Start session when userId becomes available
   useEffect(() => {
     if (!userId || isInitialized.current) return;
 
@@ -25,13 +22,9 @@ export function useSession(userId: string | null) {
     startSession(userId)
       .then((id) => {
         sessionIdRef.current = id;
-        console.log('[Session] Started:', id);
       })
-      .catch((err) => {
-        console.warn('[Session] Failed to start:', err);
-      });
+      .catch(() => {});
 
-    // Set up periodic updates (every 15 seconds)
     const updateInterval = setInterval(() => {
       if (sessionIdRef.current && statsRef.current.attempts > 0) {
         updateSession(
@@ -43,7 +36,6 @@ export function useSession(userId: string | null) {
       }
     }, 15_000);
 
-    // End session on page unload
     const handleUnload = () => {
       if (sessionIdRef.current) {
         endSession(
@@ -55,7 +47,7 @@ export function useSession(userId: string | null) {
       }
     };
 
-    // Handle visibility change (mobile browsers may not fire beforeunload)
+    // mobile browsers don't always fire beforeunload
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && sessionIdRef.current) {
         endSession(
@@ -64,15 +56,12 @@ export function useSession(userId: string | null) {
           statsRef.current.correct,
           statsRef.current.totalTimeMs
         );
-        // Start a new session when they come back
         sessionIdRef.current = null;
         isInitialized.current = false;
       } else if (document.visibilityState === 'visible' && !sessionIdRef.current && userId) {
-        // Restart session when page becomes visible again
         startSession(userId)
           .then((id) => {
             sessionIdRef.current = id;
-            // Reset stats for new session
             statsRef.current = { attempts: 0, correct: 0, totalTimeMs: 0 };
           })
           .catch(() => {});
@@ -87,7 +76,6 @@ export function useSession(userId: string | null) {
       window.removeEventListener('beforeunload', handleUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
 
-      // End session on unmount
       if (sessionIdRef.current) {
         endSession(
           sessionIdRef.current,
@@ -99,7 +87,6 @@ export function useSession(userId: string | null) {
     };
   }, [userId]);
 
-  // Function to record an attempt
   const recordAttempt = useCallback((isCorrect: boolean, timeMs: number) => {
     statsRef.current.attempts += 1;
     if (isCorrect) {
@@ -107,7 +94,6 @@ export function useSession(userId: string | null) {
     }
     statsRef.current.totalTimeMs += timeMs;
 
-    // Push update to server immediately so session stats stay current
     if (sessionIdRef.current) {
       updateSession(
         sessionIdRef.current,

@@ -7,7 +7,6 @@ import './app/App.css';
 import './features/practice/practice.css';
 import './features/admin/admin.css';
 
-// hash-based routing, nothing fancy
 function Router() {
   const [route, setRoute] = React.useState(window.location.hash);
 

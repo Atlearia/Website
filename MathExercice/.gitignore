@@ -11,12 +11,9 @@ dist/
 .env.*.local
 server/.env
 
-# Keep example env files
+# keep example env files
 !.env.example
 !server/.env.example
-
-# .env.production is safe (no secrets, just the public API URL)
-!.env.production
 
 # OS files
 .DS_Store

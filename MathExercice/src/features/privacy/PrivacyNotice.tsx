@@ -1,7 +1,6 @@
 import './privacy.css';
 
 export default function PrivacyNotice() {
-  // let ppl revoke consent from here too
   const handleRevoke = () => {
     localStorage.removeItem('dataConsent');
     localStorage.removeItem('anonUserId');

@@ -12,7 +12,7 @@ interface ProblemCardProps {
   problem: Problem;
   onCorrect: () => void;
   onIncorrect: () => void;
-  disabled: boolean; // true when 100/100 reached
+  disabled: boolean;
 }
 
 export default function ProblemCard({
@@ -23,18 +23,17 @@ export default function ProblemCard({
 }: ProblemCardProps) {
   const [value, setValue] = useState('');
   const [shake, setShake] = useState(false);
-  const [flash, setFlash] = useState(false); // correct flash
+  const [flash, setFlash] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const submittedRef = useRef(false); // prevents double-counting
+  const submittedRef = useRef(false);
 
-  // Re-focus input after every new problem or on mount.
+
   useEffect(() => {
     inputRef.current?.focus();
     submittedRef.current = false;
     setValue('');
   }, [problem]);
 
-  // ── Submit logic ──────────────────────────────────────────────────
   const trySubmit = useCallback(
     (raw: string) => {
       if (disabled || submittedRef.current) return;
@@ -45,13 +44,12 @@ export default function ProblemCard({
       if (isNaN(parsed)) return;
 
       if (parsed === problem.answer) {
-        submittedRef.current = true; // lock until next problem
+        submittedRef.current = true;
         setFlash(true);
         setTimeout(() => setFlash(false), 350);
         onCorrect();
       } else {
-        // Quick shake feedback. We clear the input so the kid can re-type
-        // immediately — faster than making them select-all & delete.
+        // clear input so the kid can retype immediately
         setShake(true);
         setValue('');
         setTimeout(() => setShake(false), 300);
@@ -68,16 +66,13 @@ export default function ProblemCard({
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
-    // Allow only digits and a leading minus (for future use)
+    // digits and optional leading minus only
     if (v !== '' && !/^-?\d*$/.test(v)) return;
     setValue(v);
 
-    // Auto-submit when typed length matches answer length.
-    // Only fire when the kid has typed enough digits — avoids premature
-    // submissions while still feeling instant for correct answers.
+    // auto-submit once typed length matches answer length
     const answerStr = String(problem.answer);
     if (v.length === answerStr.length && v.length > 0) {
-      // Use a microtask so React state is settled first.
       setTimeout(() => trySubmit(v), 0);
     }
   };

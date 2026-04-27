@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 
-/**
- * A hook that mirrors useState but persists the value in localStorage.
- * Reads the initial value from storage on mount; writes on every change.
- */
+// mirrors useState but persists to localStorage
 export function useLocalStorage<T>(key: string, defaultValue: T) {
   const [value, setValue] = useState<T>(() => {
     try {
@@ -18,17 +15,14 @@ export function useLocalStorage<T>(key: string, defaultValue: T) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {
-      // Storage full or unavailable — silently ignore.
+      // storage full — ignore
     }
   }, [key, value]);
 
   return [value, setValue] as const;
 }
 
-/**
- * Thin helper – plays a short beep via Web Audio API.
- * `type`: 'success' → pleasant high tone, 'error' → low buzz.
- */
+// short audio feedback via Web Audio API
 export function playSound(type: 'success' | 'error') {
   try {
     const ctx = new AudioContext();
@@ -51,6 +45,6 @@ export function playSound(type: 'success' | 'error') {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
     osc.stop(ctx.currentTime + 0.2);
   } catch {
-    // Web Audio not available — ignore.
+    // Web Audio not available
   }
 }
