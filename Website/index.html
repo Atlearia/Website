@@ -968,9 +968,9 @@
     <div class="coming-soon-subtitle">Meanwhile...</div>
     <div class="coming-soon-buttons">
       <div class="cs-row-secondary">
-        <button class="cs-btn" id="cv-btn" onclick="openCvModal()">CV</button>
+        <button class="cs-btn" id="cv-btn" onclick="openCvModal()" style="margin-left: 20px;">CV</button>
         <a class="cs-btn cs-btn-github" href="https://github.com/Atlearia" target="_blank"
-          rel="noopener noreferrer">Github</a>
+          rel="noopener noreferrer" style="margin-left: 70px;">Github</a>
       </div>
       <button class="cs-btn cs-btn-primary" id="guestbook-btn" onclick="openGuestbook()">Write to me</button>
     </div>
@@ -1545,6 +1545,8 @@
       mathBtn.href = '/math';
     }
 
+    let mixer;
+
     gltfLoader.load(
       MODEL_URL,
       (gltf) => {
@@ -1567,7 +1569,12 @@
 
         scene.add(model);
 
-
+        if (gltf.animations && gltf.animations.length > 0) {
+          mixer = new THREE.AnimationMixer(model);
+          gltf.animations.forEach((clip) => {
+            mixer.clipAction(clip).play();
+          });
+        }
 
         // fade out loader
         progressFill.style.width = '100%';
@@ -1760,6 +1767,8 @@
     function animate() {
       requestAnimationFrame(animate);
       const delta = clock.getDelta();
+
+      if (mixer) mixer.update(delta);
 
       // intro
       if (introActive) {
