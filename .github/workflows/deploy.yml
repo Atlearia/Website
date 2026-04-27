@@ -1,0 +1,67 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      # ── Build MathExercice (Vite/React) ──
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: MathExercice/package-lock.json
+
+      - name: Install & build MathExercice
+        working-directory: MathExercice
+        run: |
+          npm ci
+          npm run build
+
+      # ── Assemble deploy directory ──
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+
+          # Copy Website/ (static portfolio) as the root
+          cp -r Website/* _site/
+          cp Website/.gitattributes _site/ 2>/dev/null || true
+
+          # Copy MathExercice build output into /math
+          cp -r MathExercice/dist _site/math
+
+          # Ensure CNAME is at the root for custom domain
+          echo "ningye.ca" > _site/CNAME
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+          name: github-pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages
