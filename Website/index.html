@@ -1431,8 +1431,15 @@
     // runs during loading, picks quality settings based on the visitor's GPU
     import { SystemPerfTracker, adaptForThreeJS, applyToRenderer } from './SystemPerfTracker/perf-tracker.js';
 
+    // ── KILL SWITCH ──
+    // set to false to disable automatic quality changes.
+    // the system still runs detection and shows results in the admin panel,
+    // but won't touch the renderer. everything stays at original defaults.
+    const ENABLE_ADAPTIVE_QUALITY = false;
+
     // kick off hardware analysis immediately, it runs in parallel with
-    // the model download so it doesn't add any loading time
+    // the model download so it doesn't add any loading time.
+    // runs even when disabled bc we still want the info for the admin panel.
     const perfTracker = new SystemPerfTracker({ runBenchmark: true });
     const perfPromise = perfTracker.analyze().catch(err => {
       console.warn('perf tracker failed, using defaults:', err);
@@ -1525,40 +1532,42 @@
     };
 
     // apply a tier preset to the live renderer. called from the panel buttons.
+    // when ENABLE_ADAPTIVE_QUALITY is off, this only updates the UI highlight.
     window.setQualityTier = function(tier) {
       const preset = TIER_PRESETS[tier];
       if (!preset) return;
       currentTierOverride = tier;
 
-      // renderer settings
-      renderer.setPixelRatio(preset.pixelRatio);
-      renderer.toneMapping = preset.toneMapping;
-      renderer.toneMappingExposure = preset.toneMappingExposure;
-      renderer.shadowMap.enabled = preset.shadowsEnabled;
+      if (ENABLE_ADAPTIVE_QUALITY) {
+        // renderer settings
+        renderer.setPixelRatio(preset.pixelRatio);
+        renderer.toneMapping = preset.toneMapping;
+        renderer.toneMappingExposure = preset.toneMappingExposure;
+        renderer.shadowMap.enabled = preset.shadowsEnabled;
 
-      // firefly visuals (we can't rebuild the buffer, but we can
-      // fake it by adjusting size and opacity)
-      if (SHOW_FIREFLIES) {
-        if (preset.fireflyCount === 0) {
-          ffMat.visible = false;
-        } else {
-          ffMat.visible = true;
-          // scale particle size with the tier
-          ffMat.size = preset.fireflyCount >= 400 ? 0.14 : preset.fireflyCount >= 200 ? 0.12 : 0.08;
-          ffMat.opacity = preset.fireflyCount >= 400 ? 0.8 : preset.fireflyCount >= 200 ? 0.7 : 0.4;
+        // firefly visuals
+        if (SHOW_FIREFLIES) {
+          if (preset.fireflyCount === 0) {
+            ffMat.visible = false;
+          } else {
+            ffMat.visible = true;
+            ffMat.size = preset.fireflyCount >= 400 ? 0.14 : preset.fireflyCount >= 200 ? 0.12 : 0.08;
+            ffMat.opacity = preset.fireflyCount >= 400 ? 0.8 : preset.fireflyCount >= 200 ? 0.7 : 0.4;
+          }
         }
       }
 
-      // update the panel UI
+      // update the panel UI always (even when disabled, so you can see what you picked)
       document.querySelectorAll('.qp-tier-btn').forEach(btn => {
         btn.classList.toggle('active', parseInt(btn.dataset.tier) === tier);
       });
       const label = tier === 4 ? 'ULTRA MAX' : preset.label;
-      document.getElementById('qp-current').textContent = `active: ${label} (tier ${tier})`;
+      const suffix = ENABLE_ADAPTIVE_QUALITY ? '' : ' (display only)';
+      document.getElementById('qp-current').textContent = `active: ${label} (tier ${tier})${suffix}`;
       document.getElementById('qp-auto-label').textContent =
         detectedTier !== null ? `auto-detected: tier ${detectedTier}` : '';
 
-      console.log(`[quality] switched to tier ${tier} (${label})`);
+      console.log(`[quality] switched to tier ${tier} (${label})${suffix}`);
     };
 
     // orbit controls
@@ -1761,27 +1770,42 @@
           adaptedQuality = adaptForThreeJS({ tier: perfResult.tier, settings: perfResult.settings });
           detectedTier = perfResult.tier;
 
-          // apply quality settings to the renderer
-          applyToRenderer(renderer, adaptedQuality);
+          // only touch renderer settings if the kill switch is on
+          if (ENABLE_ADAPTIVE_QUALITY) {
+            applyToRenderer(renderer, adaptedQuality);
+            MAX_TEX = adaptedQuality.textures.maxSize;
+          }
 
-          // update texture limit based on detected hardware
-          MAX_TEX = adaptedQuality.textures.maxSize;
-
-          // populate the admin panel with detection results
+          // populate the admin panel with detection results regardless
           const gpu = perfResult.hardware.gpu || 'unknown';
           const conf = (perfResult.confidence * 100).toFixed(1);
           const bench = perfResult.benchmark ? `${perfResult.benchmark.fps} fps` : 'skipped';
+          const mode = ENABLE_ADAPTIVE_QUALITY ? '' : '\nmode: display only';
           document.getElementById('qp-info').textContent =
-            `gpu: ${gpu}\nconf: ${conf}%\nbench: ${bench}`;
+            `gpu: ${gpu}\nconf: ${conf}%\nbench: ${bench}${mode}`;
 
-          // set the detected tier as active in the panel
-          window.setQualityTier(perfResult.tier);
+          // highlight detected tier in the panel but dont apply it
+          // unless the flag is on
+          if (ENABLE_ADAPTIVE_QUALITY) {
+            window.setQualityTier(perfResult.tier);
+          } else {
+            // just mark the detected tier visually without changing anything
+            document.querySelectorAll('.qp-tier-btn').forEach(btn => {
+              btn.classList.toggle('active', parseInt(btn.dataset.tier) === perfResult.tier);
+            });
+            document.getElementById('qp-current').textContent =
+              `detected: tier ${perfResult.tier} (not applied)`;
+            document.getElementById('qp-auto-label').textContent =
+              'adaptive quality OFF';
+          }
 
           console.log(
             `[SystemPerfTracker] tier ${perfResult.tier} | ` +
             `gpu: ${gpu} | ` +
             `confidence: ${conf}% | ` +
-            `textures: ${MAX_TEX}px | particles: ${adaptedQuality.particles.fireflyCount}`
+            (ENABLE_ADAPTIVE_QUALITY
+              ? `textures: ${MAX_TEX}px | particles: ${adaptedQuality.particles.fireflyCount}`
+              : 'adaptive quality disabled, display only')
           );
         } else {
           // perf tracker failed, panel still shows something useful
@@ -1812,14 +1836,11 @@
           });
         }
 
-        // if the perf tracker says this device can't handle the scene,
-        // update the firefly count. we rebuild the geometry since it was
-        // already created with the default count.
-        if (adaptedQuality) {
+        // if adaptive quality is on and the perf tracker says this device
+        // can't handle the scene, adjust the firefly appearance
+        if (ENABLE_ADAPTIVE_QUALITY && adaptedQuality) {
           const newCount = adaptedQuality.particles.fireflyCount;
           if (newCount !== FIREFLY_COUNT && SHOW_FIREFLIES) {
-            // adjust the Points object opacity/size as a lighter alternative
-            // to rebuilding the entire buffer. fewer visible = less GPU fill.
             ffMat.size = newCount > 200 ? 0.12 : 0.08;
             ffMat.opacity = newCount > 200 ? 0.7 : 0.4;
           }

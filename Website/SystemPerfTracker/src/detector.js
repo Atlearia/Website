@@ -10,10 +10,14 @@
 function getGPUInfo() {
   try {
     const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    // request the dedicated GPU on hybrid-graphics laptops.
+    // without this, a machine with both Intel iGPU and an RTX 4070
+    // reports the Intel string, which throws off the whole pipeline.
+    const ctxOpts = { powerPreference: 'high-performance' };
+    const gl = canvas.getContext('webgl2', ctxOpts) || canvas.getContext('webgl', ctxOpts);
     if (!gl) return { renderer: null, vendor: null, webglVersion: 0 };
 
-    const webglVersion = canvas.getContext('webgl2') ? 2 : 1;
+    const webglVersion = canvas.getContext('webgl2', ctxOpts) ? 2 : 1;
     const ext = gl.getExtension('WEBGL_debug_renderer_info');
 
     let renderer = null;

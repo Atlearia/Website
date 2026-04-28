@@ -10,7 +10,10 @@ export async function runMicroBenchmark() {
     try {
       const c = document.createElement('canvas');
       c.width = BENCH_SIZE; c.height = BENCH_SIZE;
-      const gl = c.getContext('webgl2') || c.getContext('webgl');
+      // same as the detector, ask for the dedicated GPU so we're not
+      // benchmarking the integrated Intel on a dual-GPU laptop
+      const ctxOpts = { powerPreference: 'high-performance' };
+      const gl = c.getContext('webgl2', ctxOpts) || c.getContext('webgl', ctxOpts);
       if (!gl) { resolve({ fps: 0, frameCount: 0 }); return; }
 
       const vs = `attribute vec4 a;void main(){gl_Position=a;}`;

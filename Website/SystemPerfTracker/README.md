@@ -82,3 +82,5 @@ import `perf-tracker.js`, and it works. No dependencies on the rest of
 ningye.ca. The only coupling is the adapter, which outputs settings that
 happen to match what the Three.js scene expects, but even that is generic
 enough to reuse.
+
+BETA MODE !!!!
