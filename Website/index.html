@@ -282,14 +282,108 @@
     #debug-coords,
     #record-btn,
     #math-btn,
+    #quality-panel,
     #controls-hint {
       display: none;
     }
 
     body.dev-mode #debug-coords,
     body.dev-mode #record-btn,
-    body.dev-mode #math-btn {
+    body.dev-mode #math-btn,
+    body.dev-mode #quality-panel {
       display: block;
+    }
+
+    /* quality tier panel in devmode */
+    #quality-panel {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 50;
+      width: 240px;
+      padding: 14px 16px;
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid rgba(160, 140, 255, 0.2);
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      color: #c0c0d0;
+    }
+
+    .qp-title {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(160, 140, 255, 0.5);
+      margin-bottom: 10px;
+    }
+
+    .qp-info {
+      font-size: 10px;
+      line-height: 1.6;
+      color: rgba(160, 200, 160, 0.6);
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .qp-tiers {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .qp-tier-btn {
+      flex: 1;
+      padding: 7px 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      letter-spacing: 0.5px;
+      text-align: center;
+      border: 1px solid rgba(100, 100, 120, 0.3);
+      border-radius: 4px;
+      background: rgba(30, 30, 40, 0.6);
+      color: rgba(180, 180, 200, 0.5);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .qp-tier-btn:hover {
+      background: rgba(60, 60, 80, 0.6);
+      color: rgba(200, 200, 220, 0.8);
+    }
+
+    .qp-tier-btn.active {
+      border-color: rgba(160, 140, 255, 0.5);
+      background: rgba(160, 140, 255, 0.12);
+      color: #a08cff;
+    }
+
+    /* ultra max gets special treatment bc why not */
+    .qp-tier-btn.ultra {
+      border-color: rgba(255, 180, 60, 0.3);
+    }
+    .qp-tier-btn.ultra:hover {
+      border-color: rgba(255, 180, 60, 0.5);
+      color: rgba(255, 210, 120, 0.8);
+    }
+    .qp-tier-btn.ultra.active {
+      border-color: rgba(255, 180, 60, 0.6);
+      background: rgba(255, 180, 60, 0.12);
+      color: #ffc040;
+      box-shadow: 0 0 12px rgba(255, 180, 60, 0.1);
+    }
+
+    .qp-auto-label {
+      font-size: 9px;
+      color: rgba(140, 140, 160, 0.4);
+      text-align: center;
+    }
+
+    .qp-current {
+      font-size: 10px;
+      color: rgba(160, 255, 160, 0.6);
+      margin-top: 6px;
+      text-align: center;
     }
 
     #debug-coords {
@@ -952,6 +1046,21 @@
   <button id="record-btn" onclick="startRecording()">● REC 7s</button>
   <a id="math-btn" href="#" target="_blank">⊞ MATH</a>
 
+  <!-- quality tier panel, dev mode only -->
+  <div id="quality-panel">
+    <div class="qp-title">quality tier</div>
+    <div class="qp-info" id="qp-info">detecting...</div>
+    <div class="qp-tiers">
+      <button class="qp-tier-btn" data-tier="0" onclick="setQualityTier(0)">OFF</button>
+      <button class="qp-tier-btn" data-tier="1" onclick="setQualityTier(1)">LOW</button>
+      <button class="qp-tier-btn" data-tier="2" onclick="setQualityTier(2)">MID</button>
+      <button class="qp-tier-btn" data-tier="3" onclick="setQualityTier(3)">HIGH</button>
+      <button class="qp-tier-btn ultra" data-tier="4" onclick="setQualityTier(4)">ULTRA</button>
+    </div>
+    <div class="qp-auto-label" id="qp-auto-label"></div>
+    <div class="qp-current" id="qp-current"></div>
+  </div>
+
   <!-- Post-load controls hint -->
   <div id="controls-hint" class="ui-fade">
     <div class="hint-item"><span class="hint-key">LMB</span> Orbit</div>
@@ -1318,6 +1427,18 @@
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
+    // hardware detection + RAG quality pipeline
+    // runs during loading, picks quality settings based on the visitor's GPU
+    import { SystemPerfTracker, adaptForThreeJS, applyToRenderer } from './SystemPerfTracker/perf-tracker.js';
+
+    // kick off hardware analysis immediately, it runs in parallel with
+    // the model download so it doesn't add any loading time
+    const perfTracker = new SystemPerfTracker({ runBenchmark: true });
+    const perfPromise = perfTracker.analyze().catch(err => {
+      console.warn('perf tracker failed, using defaults:', err);
+      return null;
+    });
+
     // dom nodes
     const loaderEl = document.getElementById('loader');
     const progressFill = document.getElementById('progress-fill');
@@ -1325,6 +1446,7 @@
     const hintsEl = document.getElementById('controls-hint');
 
     // detect mobile for performance tuning
+    // this is a quick check used before the perf tracker finishes
     const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
 
     // scene setup
@@ -1349,19 +1471,95 @@
     // pull back a bit for the intro dolly effect
     camera.position.copy(TARGET_CAM_POS).multiplyScalar(1.15);
 
-    // setup renderer
+    // setup renderer with conservative defaults.
+    // the perf tracker will override these once it finishes analyzing.
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: 'high-performance'
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.6;
-    renderer.shadowMap.enabled = !isMobile;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    // shadows off: the glb lights are scaled to 0.0005, shadow contribution is invisible
+    renderer.shadowMap.enabled = false;
     document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    // quality settings from the perf tracker. populated once analysis finishes.
+    let adaptedQuality = null;
+    let currentTierOverride = null; // when admin manually picks a tier
+    let detectedTier = null; // what the RAG pipeline decided
+
+    // tier presets for the admin panel. tier 4 is "ultra max",
+    // cranks everything past what auto-detect would ever pick
+    const TIER_PRESETS = {
+      0: {
+        pixelRatio: 0.5, maxTextureSize: 512, shadowsEnabled: false,
+        fireflyCount: 0, antialias: false,
+        toneMapping: 1, toneMappingExposure: 1.0, label: 'OFF',
+      },
+      1: {
+        pixelRatio: 0.75, maxTextureSize: 1024, shadowsEnabled: false,
+        fireflyCount: 80, antialias: false,
+        toneMapping: 4, toneMappingExposure: 1.4, label: 'LOW',
+      },
+      2: {
+        pixelRatio: 1.0, maxTextureSize: 2048, shadowsEnabled: false,
+        fireflyCount: 200, antialias: true,
+        toneMapping: 4, toneMappingExposure: 1.6, label: 'MID',
+      },
+      3: {
+        pixelRatio: Math.min(window.devicePixelRatio, 1.5), maxTextureSize: 4096,
+        shadowsEnabled: true, fireflyCount: 400, antialias: true,
+        toneMapping: 4, toneMappingExposure: 1.6, label: 'HIGH',
+      },
+      4: {
+        // the pretty one. cranked pixel ratio, full device dpr,
+        // max textures, max particles, shadows on. this is what
+        // you'd show off on a beefy machine.
+        pixelRatio: window.devicePixelRatio, maxTextureSize: 4096,
+        shadowsEnabled: true, fireflyCount: 600, antialias: true,
+        toneMapping: 4, toneMappingExposure: 1.8, label: 'ULTRA MAX',
+      },
+    };
+
+    // apply a tier preset to the live renderer. called from the panel buttons.
+    window.setQualityTier = function(tier) {
+      const preset = TIER_PRESETS[tier];
+      if (!preset) return;
+      currentTierOverride = tier;
+
+      // renderer settings
+      renderer.setPixelRatio(preset.pixelRatio);
+      renderer.toneMapping = preset.toneMapping;
+      renderer.toneMappingExposure = preset.toneMappingExposure;
+      renderer.shadowMap.enabled = preset.shadowsEnabled;
+
+      // firefly visuals (we can't rebuild the buffer, but we can
+      // fake it by adjusting size and opacity)
+      if (SHOW_FIREFLIES) {
+        if (preset.fireflyCount === 0) {
+          ffMat.visible = false;
+        } else {
+          ffMat.visible = true;
+          // scale particle size with the tier
+          ffMat.size = preset.fireflyCount >= 400 ? 0.14 : preset.fireflyCount >= 200 ? 0.12 : 0.08;
+          ffMat.opacity = preset.fireflyCount >= 400 ? 0.8 : preset.fireflyCount >= 200 ? 0.7 : 0.4;
+        }
+      }
+
+      // update the panel UI
+      document.querySelectorAll('.qp-tier-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.tier) === tier);
+      });
+      const label = tier === 4 ? 'ULTRA MAX' : preset.label;
+      document.getElementById('qp-current').textContent = `active: ${label} (tier ${tier})`;
+      document.getElementById('qp-auto-label').textContent =
+        detectedTier !== null ? `auto-detected: tier ${detectedTier}` : '';
+
+      console.log(`[quality] switched to tier ${tier} (${label})`);
+    };
 
     // orbit controls
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -1416,7 +1614,8 @@
 
     // firefly particles
     const SHOW_FIREFLIES = true;  // toggle fireflies on/off
-    const FIREFLY_COUNT = isMobile ? 120 : 400;
+    // default count, will be overridden by perf tracker if it finishes in time
+    let FIREFLY_COUNT = isMobile ? 120 : 400;
     const FIREFLY_SPREAD = 5;       // spawn radius
     const FIREFLY_HEIGHT_MIN = 0.2;
     const FIREFLY_HEIGHT_MAX = 3.5;
@@ -1486,7 +1685,9 @@
     }
 
     // downscale textures so it doesnt crash mobile browsers bc the glb is huge
-    const MAX_TEX = isMobile ? 1024 : 2048;
+    // perf tracker may override this, but we need a sane default in case
+    // the model loads before the analysis finishes
+    let MAX_TEX = isMobile ? 1024 : 2048;
     const TEX_KEYS = [
       'map', 'normalMap', 'roughnessMap', 'metalnessMap',
       'aoMap', 'emissiveMap', 'bumpMap', 'alphaMap', 'lightMap'
@@ -1549,10 +1750,45 @@
 
     gltfLoader.load(
       MODEL_URL,
-      (gltf) => {
+      async (gltf) => {
         const model = gltf.scene;
 
-        // crunch textures
+        // wait for the perf tracker if it hasn't finished yet.
+        // it usually finishes well before the model downloads,
+        // but on fast connections it might still be benchmarking.
+        const perfResult = await perfPromise;
+        if (perfResult) {
+          adaptedQuality = adaptForThreeJS({ tier: perfResult.tier, settings: perfResult.settings });
+          detectedTier = perfResult.tier;
+
+          // apply quality settings to the renderer
+          applyToRenderer(renderer, adaptedQuality);
+
+          // update texture limit based on detected hardware
+          MAX_TEX = adaptedQuality.textures.maxSize;
+
+          // populate the admin panel with detection results
+          const gpu = perfResult.hardware.gpu || 'unknown';
+          const conf = (perfResult.confidence * 100).toFixed(1);
+          const bench = perfResult.benchmark ? `${perfResult.benchmark.fps} fps` : 'skipped';
+          document.getElementById('qp-info').textContent =
+            `gpu: ${gpu}\nconf: ${conf}%\nbench: ${bench}`;
+
+          // set the detected tier as active in the panel
+          window.setQualityTier(perfResult.tier);
+
+          console.log(
+            `[SystemPerfTracker] tier ${perfResult.tier} | ` +
+            `gpu: ${gpu} | ` +
+            `confidence: ${conf}% | ` +
+            `textures: ${MAX_TEX}px | particles: ${adaptedQuality.particles.fireflyCount}`
+          );
+        } else {
+          // perf tracker failed, panel still shows something useful
+          document.getElementById('qp-info').textContent = 'detection failed\nusing defaults';
+        }
+
+        // crunch textures using the (possibly updated) MAX_TEX limit
         shrinkAllTextures(model);
 
         // force shadows on everything, kinda expensive but looks better
@@ -1574,6 +1810,19 @@
           gltf.animations.forEach((clip) => {
             mixer.clipAction(clip).play();
           });
+        }
+
+        // if the perf tracker says this device can't handle the scene,
+        // update the firefly count. we rebuild the geometry since it was
+        // already created with the default count.
+        if (adaptedQuality) {
+          const newCount = adaptedQuality.particles.fireflyCount;
+          if (newCount !== FIREFLY_COUNT && SHOW_FIREFLIES) {
+            // adjust the Points object opacity/size as a lighter alternative
+            // to rebuilding the entire buffer. fewer visible = less GPU fill.
+            ffMat.size = newCount > 200 ? 0.12 : 0.08;
+            ffMat.opacity = newCount > 200 ? 0.7 : 0.4;
+          }
         }
 
         // fade out loader
