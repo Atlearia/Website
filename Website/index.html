@@ -1760,12 +1760,16 @@
     gltfLoader.load(
       MODEL_URL,
       async (gltf) => {
+        console.log('[ANIM-DEBUG] gltf callback fired, animations:', gltf.animations.length,
+          gltf.animations.map(a => a.name));
         const model = gltf.scene;
 
         // wait for the perf tracker if it hasn't finished yet.
         // it usually finishes well before the model downloads,
         // but on fast connections it might still be benchmarking.
+        console.log('[ANIM-DEBUG] awaiting perfPromise...');
         const perfResult = await perfPromise;
+        console.log('[ANIM-DEBUG] perfPromise resolved, result:', !!perfResult);
         if (perfResult) {
           adaptedQuality = adaptForThreeJS({ tier: perfResult.tier, settings: perfResult.settings });
           detectedTier = perfResult.tier;
@@ -1830,10 +1834,18 @@
         scene.add(model);
 
         if (gltf.animations && gltf.animations.length > 0) {
+          console.log('[ANIM-DEBUG] creating mixer, clip count:', gltf.animations.length);
           mixer = new THREE.AnimationMixer(model);
-          gltf.animations.forEach((clip) => {
-            mixer.clipAction(clip).play();
+          gltf.animations.forEach((clip, i) => {
+            const action = mixer.clipAction(clip);
+            action.play();
+            console.log('[ANIM-DEBUG] playing clip', i, clip.name,
+              'duration:', clip.duration, 'tracks:', clip.tracks.length);
           });
+          console.log('[ANIM-DEBUG] mixer created, actions:', mixer._actions.length);
+        } else {
+          console.warn('[ANIM-DEBUG] NO ANIMATIONS in gltf.animations!',
+            'raw value:', gltf.animations);
         }
 
         // if adaptive quality is on and the perf tracker says this device
@@ -2034,11 +2046,21 @@
     // main loop
     const clock = new THREE.Clock();
 
+    let _animDebugCount = 0;
     function animate() {
       requestAnimationFrame(animate);
       const delta = clock.getDelta();
 
-      if (mixer) mixer.update(delta);
+      if (mixer) {
+        mixer.update(delta);
+        if (_animDebugCount < 3) {
+          console.log('[ANIM-DEBUG] mixer.update tick', _animDebugCount,
+            'delta:', delta.toFixed(4),
+            'actions:', mixer._actions.length,
+            'time:', mixer.time.toFixed(3));
+          _animDebugCount++;
+        }
+      }
 
       // intro
       if (introActive) {
