@@ -1740,11 +1740,18 @@
     const gltfLoader = new GLTFLoader();
     gltfLoader.setDRACOLoader(dracoLoader);
 
-    // ── LOCAL_MODE: flip to true for local dev, false for deploy ──
+    // ── LOCAL_MODE ──
     const LOCAL_MODE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
-    const MODEL_URL = LOCAL_MODE
-      ? 'assets/Room_optimized.glb'
-      : 'https://assets.ningye.ca/Room_optimized.glb';
+
+    // ── ASSET SOURCE FLAG ──
+    // false = serve GLB from /assets/ (bundled with the repo, deployed to GitHub Pages)
+    // true  = serve GLB from Cloudflare R2 CDN (assets.ningye.ca)
+    // currently false because the R2 cache is serving an old file with no animations
+    const USE_R2_ASSETS = false;
+
+    const MODEL_URL = (!LOCAL_MODE && USE_R2_ASSETS)
+      ? 'https://assets.ningye.ca/Room_optimized.glb'
+      : 'assets/Room_optimized.glb';
 
     // set math button href based on mode
     const mathBtn = document.getElementById('math-btn');

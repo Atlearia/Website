@@ -1,8 +1,8 @@
-# Large assets (served from Cloudflare R2)
+# Large assets — original unoptimized model stays out of git
 Room.glb
-Room_optimized.glb 
-assets/
-#dont even need R2 for optimized but why not at this point lol
+assets/Room_optimized_backup.glb
+# Room_optimized.glb is now served from /assets/ via GitHub Pages
+# assets/ folder is no longer ignored — the optimized GLB ships with the repo
 
 # Dev/benchmark pages — not for production
 ab_test.html
