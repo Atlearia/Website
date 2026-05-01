@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Cormorant+Garamond:wght@300;400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Cormorant+Garamond:wght@300;400;500&family=MedievalSharp&display=swap"
     rel="stylesheet">
   <style>
     *,
@@ -64,9 +64,9 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: var(--bg-deep);
-      transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1),
-        visibility 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+      background: #000000;
+      transition: opacity 1.4s cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 1.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     #loader.hidden {
@@ -75,13 +75,7 @@
       pointer-events: none;
     }
 
-    /* background particles for loader */
-    #particle-canvas {
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-    }
-
+    /* tree animation container */
     .loader-content {
       position: relative;
       z-index: 1;
@@ -91,145 +85,64 @@
       gap: 0;
     }
 
-    /* drawing the spinning rings */
-    .loader-sigil {
-      width: 80px;
-      height: 80px;
-      position: relative;
-      margin-bottom: 36px;
+    /* the frame animation image — centered, no glow/shadow */
+    #loader-tree-frame {
+      width: clamp(280px, 50vw, 520px);
+      height: auto;
+      object-fit: contain;
+      opacity: 0;
+      animation: tree-fade-in 1.2s ease forwards 0.1s;
     }
 
-    .sigil-ring {
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      border: 1.5px solid transparent;
+    @keyframes tree-fade-in {
+      from { opacity: 0; transform: scale(0.97); }
+      to   { opacity: 1; transform: scale(1); }
     }
 
-    .sigil-ring-outer {
-      border-top-color: var(--accent-primary);
-      border-right-color: rgba(160, 140, 255, 0.3);
-      animation: sigil-spin 3s linear infinite;
-    }
-
-    .sigil-ring-inner {
-      inset: 12px;
-      border-bottom-color: var(--accent-warm);
-      border-left-color: rgba(232, 196, 124, 0.3);
-      animation: sigil-spin 2s linear infinite reverse;
-    }
-
-    .sigil-dot {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--accent-primary);
-      box-shadow: 0 0 20px var(--accent-primary),
-        0 0 40px rgba(160, 140, 255, 0.3);
-      animation: sigil-pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes sigil-spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    @keyframes sigil-pulse {
-
-      0%,
-      100% {
-        opacity: 0.6;
-        transform: translate(-50%, -50%) scale(1);
-      }
-
-      50% {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1.4);
-      }
-    }
-
-    .loader-title {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 28px;
-      font-weight: 300;
+    /* percentage counter — MedievalSharp fantasy font */
+    .loader-percent {
+      margin-top: 24px;
+      font-family: 'MedievalSharp', 'Cormorant Garamond', cursive;
+      font-size: clamp(16px, 2.5vw, 24px);
+      font-variant-numeric: tabular-nums;
       letter-spacing: 6px;
-      text-transform: uppercase;
-      color: var(--text-primary);
-      margin-bottom: 8px;
+      color: rgba(232, 196, 124, 0.85);
+      text-shadow: 0 0 18px rgba(232, 196, 124, 0.25);
       opacity: 0;
-      animation: fade-up 0.8s ease forwards 0.2s;
+      animation: percent-fade-in 0.8s ease forwards 0.5s;
     }
 
-    .loader-subtitle {
-      font-size: 11px;
-      font-weight: 300;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: 40px;
-      opacity: 0;
-      animation: fade-up 0.8s ease forwards 0.5s;
+    @keyframes percent-fade-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
-    .progress-track {
-      width: 240px;
+    /* thin golden progress bar */
+    .loader-progress-bar {
+      margin-top: 12px;
+      width: clamp(140px, 20vw, 220px);
       height: 1px;
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(232, 196, 124, 0.08);
       border-radius: 1px;
       overflow: hidden;
       position: relative;
       opacity: 0;
-      animation: fade-up 0.8s ease forwards 0.7s;
+      animation: percent-fade-in 0.8s ease forwards 0.7s;
     }
 
-    .progress-fill {
+    .loader-progress-fill {
       position: absolute;
-      top: 0;
-      left: 0;
+      top: 0; left: 0;
       height: 100%;
       width: 0%;
-      background: linear-gradient(90deg, var(--accent-primary), var(--accent-warm));
+      background: linear-gradient(90deg, rgba(232,196,124,0.4), rgba(255,180,80,0.8));
       border-radius: 1px;
       transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .progress-glow {
-      position: absolute;
-      top: -4px;
-      right: -2px;
-      width: 20px;
-      height: 9px;
-      background: radial-gradient(ellipse, var(--accent-primary), transparent);
-      filter: blur(3px);
-      opacity: 0.8;
-    }
-
-    .loader-percent {
-      margin-top: 16px;
-      font-size: 12px;
-      font-weight: 400;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: 2px;
-      color: rgba(160, 140, 255, 0.6);
-      opacity: 0;
-      animation: fade-up 0.8s ease forwards 0.9s;
-    }
-
     @keyframes fade-up {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
     /* hints UI */
@@ -1024,20 +937,12 @@
 <body>
   <!-- Loading screen -->
   <div id="loader">
-    <canvas id="particle-canvas"></canvas>
     <div class="loader-content">
-      <div class="loader-sigil">
-        <div class="sigil-ring sigil-ring-outer"></div>
-        <div class="sigil-ring sigil-ring-inner"></div>
-        <div class="sigil-dot"></div>
+      <img id="loader-tree-frame" src="assets/loadingscreen/ezgif-frame-001.jpg" alt="Loading...">
+      <div class="loader-percent" id="loader-percent">0%</div>
+      <div class="loader-progress-bar">
+        <div class="loader-progress-fill" id="progress-fill"></div>
       </div>
-      <div class="loader-title">ningye.ca</div>
-      <div class="progress-track">
-        <div class="progress-fill" id="progress-fill">
-          <div class="progress-glow"></div>
-        </div>
-      </div>
-      <div class="loader-percent" id="loader-percent">0 %</div>
     </div>
   </div>
 
@@ -1338,76 +1243,43 @@
     }
   </script>
 
-  <!-- particle system for loader, drawn on 2d context bc webgl takes too long to init -->
+  <!-- tree frame animation — advances with GLTF loading progress -->
   <script>
-    (function initParticles() {
-      const canvas = document.getElementById('particle-canvas');
-      const ctx = canvas.getContext('2d');
-      let W, H;
-      const particles = [];
-      const PARTICLE_COUNT = 60;
+    (function initTreeLoader() {
+      const TOTAL_FRAMES = 240;
+      const treeImg = document.getElementById('loader-tree-frame');
+      const frames = [];
+      let currentFrame = 0;
+      let targetFrame = 0;
 
-      function resize() {
-        W = canvas.width = window.innerWidth;
-        H = canvas.height = window.innerHeight;
-      }
-      resize();
-      window.addEventListener('resize', resize);
-
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        particles.push({
-          x: Math.random() * W,
-          y: Math.random() * H,
-          vx: (Math.random() - 0.5) * 0.3,
-          vy: (Math.random() - 0.5) * 0.3,
-          r: Math.random() * 1.5 + 0.5,
-          alpha: Math.random() * 0.25 + 0.05,
-          pulse: Math.random() * Math.PI * 2,
-        });
+      // preload all frames
+      for (let i = 1; i <= TOTAL_FRAMES; i++) {
+        const img = new Image();
+        img.src = `assets/loadingscreen/ezgif-frame-${String(i).padStart(3, '0')}.jpg`;
+        frames.push(img);
       }
 
-      function draw() {
-        ctx.clearRect(0, 0, W, H);
+      // called by the GLTF progress callback (0–100)
+      window.updateLoaderFrame = function (pct) {
+        targetFrame = Math.min(Math.floor((pct / 100) * (TOTAL_FRAMES - 1)), TOTAL_FRAMES - 1);
+      };
 
-        for (const p of particles) {
-          p.x += p.vx;
-          p.y += p.vy;
-          p.pulse += 0.01;
+      function animate() {
+        if (document.getElementById('loader').classList.contains('hidden')) return;
 
-          if (p.x < 0) p.x = W;
-          if (p.x > W) p.x = 0;
-          if (p.y < 0) p.y = H;
-          if (p.y > H) p.y = 0;
-
-          const a = p.alpha * (0.6 + 0.4 * Math.sin(p.pulse));
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(160, 140, 255, ${a})`;
-          ctx.fill();
+        // smoothly step toward target
+        if (currentFrame < targetFrame) {
+          currentFrame = Math.min(currentFrame + Math.max(1, Math.floor((targetFrame - currentFrame) * 0.12)), targetFrame);
         }
 
-        // connects particles together if they get close enough, looks cool
-        for (let i = 0; i < particles.length; i++) {
-          for (let j = i + 1; j < particles.length; j++) {
-            const dx = particles[i].x - particles[j].x;
-            const dy = particles[i].y - particles[j].y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 140) {
-              ctx.beginPath();
-              ctx.moveTo(particles[i].x, particles[i].y);
-              ctx.lineTo(particles[j].x, particles[j].y);
-              ctx.strokeStyle = `rgba(160, 140, 255, ${0.06 * (1 - dist / 140)})`;
-              ctx.lineWidth = 0.5;
-              ctx.stroke();
-            }
-          }
+        const f = frames[currentFrame];
+        if (f && f.complete && f.naturalWidth > 0) {
+          treeImg.src = f.src;
         }
 
-        if (!document.getElementById('loader').classList.contains('hidden')) {
-          requestAnimationFrame(draw);
-        }
+        requestAnimationFrame(animate);
       }
-      draw();
+      animate();
     })();
   </script>
 
@@ -1865,26 +1737,29 @@
           }
         }
 
-        // fade out loader
+        // fade out loader — let tree reach final frame first
         progressFill.style.width = '100%';
-        percentEl.textContent = '100 %';
+        percentEl.textContent = '100%';
+        if (window.updateLoaderFrame) window.updateLoaderFrame(100);
 
         setTimeout(() => {
           loaderEl.classList.add('hidden');
           beginIntroAnimation();
-        }, 600);
+        }, 1200);
       },
       (progress) => {
         if (progress.total > 0) {
           const pct = Math.min((progress.loaded / progress.total) * 100, 99);
           progressFill.style.width = pct + '%';
-          percentEl.textContent = Math.round(pct) + ' %';
+          percentEl.textContent = Math.round(pct) + '%';
+          if (window.updateLoaderFrame) window.updateLoaderFrame(pct);
         }
       },
       (err) => {
         console.error('GLB load error:', err);
-        percentEl.textContent = 'Load failed gg';
-        document.querySelector('.loader-sigil').style.display = 'none';
+        percentEl.textContent = 'Load failed';
+        const treeImg = document.getElementById('loader-tree-frame');
+        if (treeImg) treeImg.style.opacity = '0.3';
       }
     );
 
