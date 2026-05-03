@@ -96,8 +96,15 @@
     }
 
     @keyframes tree-fade-in {
-      from { opacity: 0; transform: scale(0.97); }
-      to   { opacity: 1; transform: scale(1); }
+      from {
+        opacity: 0;
+        transform: scale(0.97);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
     }
 
     /* percentage counter — MedievalSharp fantasy font */
@@ -115,8 +122,15 @@
     }
 
     @keyframes percent-fade-in {
-      from { opacity: 0; transform: translateY(6px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     /* thin golden progress bar */
@@ -134,17 +148,25 @@
 
     .loader-progress-fill {
       position: absolute;
-      top: 0; left: 0;
+      top: 0;
+      left: 0;
       height: 100%;
       width: 0%;
-      background: linear-gradient(90deg, rgba(232,196,124,0.4), rgba(255,180,80,0.8));
+      background: linear-gradient(90deg, rgba(232, 196, 124, 0.4), rgba(255, 180, 80, 0.8));
       border-radius: 1px;
       transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     @keyframes fade-up {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     /* hints UI */
@@ -277,10 +299,12 @@
     .qp-tier-btn.ultra {
       border-color: rgba(255, 180, 60, 0.3);
     }
+
     .qp-tier-btn.ultra:hover {
       border-color: rgba(255, 180, 60, 0.5);
       color: rgba(255, 210, 120, 0.8);
     }
+
     .qp-tier-btn.ultra.active {
       border-color: rgba(255, 180, 60, 0.6);
       background: rgba(255, 180, 60, 0.12);
@@ -985,8 +1009,8 @@
     <div class="coming-soon-buttons">
       <div class="cs-row-secondary">
         <button class="cs-btn" id="cv-btn" onclick="openCvModal()" style="margin-left: 20px;">CV</button>
-        <a class="cs-btn cs-btn-github" href="https://github.com/Atlearia" target="_blank"
-          rel="noopener noreferrer" style="margin-left: 70px;">Github</a>
+        <a class="cs-btn cs-btn-github" href="https://github.com/Atlearia" target="_blank" rel="noopener noreferrer"
+          style="margin-left: 70px;">Github</a>
       </div>
       <button class="cs-btn cs-btn-primary" id="guestbook-btn" onclick="openGuestbook()">Write to me</button>
     </div>
@@ -1344,6 +1368,18 @@
       0.1,
       500
     );
+    scene.add(camera);
+
+    // Dedicated light just for the medallion (Layer 1)
+    const medallionLight = new THREE.DirectionalLight(0xfff4e0, 10.5);
+    medallionLight.position.set(1, 1, 2); // Offset slightly to make normal maps pop
+    medallionLight.layers.set(1);
+    camera.add(medallionLight);
+
+    const medallionAmbient = new THREE.AmbientLight(0xffeedd, 3.0); // Provides uniform base lighting
+    medallionAmbient.layers.set(1);
+    scene.add(medallionAmbient);
+
 
     // hardcoded final positions from my debug output
     const TARGET_CAM_POS = new THREE.Vector3(0.857, 3.925, 4.559);
@@ -1407,7 +1443,7 @@
 
     // apply a tier preset to the live renderer. called from the panel buttons.
     // when ENABLE_ADAPTIVE_QUALITY is off, this only updates the UI highlight.
-    window.setQualityTier = function(tier) {
+    window.setQualityTier = function (tier) {
       const preset = TIER_PRESETS[tier];
       if (!preset) return;
       currentTierOverride = tier;
@@ -1705,6 +1741,15 @@
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
+            // Illuminate ONLY Mesh_0.003
+            if (child.name === 'Mesh_0.003') {
+              child.layers.enable(1);
+              if (child.material) {
+                // Force it to glow from within so it bypasses metallic darkness
+                child.material.emissive = new THREE.Color(0x553311); // Warm gold glow
+                child.material.emissiveIntensity = 2.0;
+              }
+            }
           }
           if (child.isLight) {
             child.intensity *= GLB_LIGHT_INTENSITY;
