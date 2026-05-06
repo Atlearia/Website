@@ -219,6 +219,7 @@
     #debug-coords,
     #record-btn,
     #math-btn,
+    #inbox-btn,
     #quality-panel,
     #controls-hint {
       display: none;
@@ -227,6 +228,7 @@
     body.dev-mode #debug-coords,
     body.dev-mode #record-btn,
     body.dev-mode #math-btn,
+    body.dev-mode #inbox-btn,
     body.dev-mode #quality-panel {
       display: block;
     }
@@ -957,6 +959,361 @@
         letter-spacing: 3px;
       }
     }
+
+    /* ── Inbox button (dev mode) ── */
+    #inbox-btn {
+      position: fixed;
+      top: 16px;
+      left: 540px;
+      z-index: 50;
+      padding: 8px 14px;
+      background: rgba(60, 255, 120, 0.15);
+      border: 1px solid rgba(60, 255, 120, 0.4);
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #60ff90;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #inbox-btn:hover {
+      background: rgba(60, 255, 120, 0.3);
+    }
+
+    /* ── Admin login modal ── */
+    #admin-login-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6, 6, 11, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    #admin-login-modal.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .admin-login-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      width: 340px;
+      max-width: 90vw;
+      padding: 32px;
+      background: rgba(20, 18, 30, 0.95);
+      border: 1px solid rgba(160, 140, 255, 0.2);
+      border-radius: 8px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    }
+
+    .admin-login-title {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(160, 140, 255, 0.6);
+      text-align: center;
+    }
+
+    .admin-login-input {
+      width: 100%;
+      padding: 12px 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      color: #e0e0f0;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(160, 140, 255, 0.2);
+      border-radius: 6px;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    .admin-login-input:focus {
+      border-color: rgba(160, 140, 255, 0.5);
+    }
+
+    .admin-login-submit {
+      padding: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border: 1px solid rgba(160, 140, 255, 0.3);
+      border-radius: 6px;
+      background: rgba(160, 140, 255, 0.1);
+      color: #a08cff;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .admin-login-submit:hover {
+      background: rgba(160, 140, 255, 0.2);
+      border-color: rgba(160, 140, 255, 0.5);
+    }
+
+    .admin-login-submit:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .admin-login-status {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      text-align: center;
+      min-height: 16px;
+      color: rgba(200, 100, 80, 0.8);
+    }
+
+    .admin-login-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid rgba(160, 140, 255, 0.2);
+      background: transparent;
+      color: rgba(200, 195, 230, 0.5);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .admin-login-close:hover {
+      background: rgba(160, 140, 255, 0.15);
+      color: #e0e0f0;
+    }
+
+    /* ── Admin inbox modal ── */
+    #admin-inbox-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 20px;
+      background: rgba(6, 6, 11, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      overflow-y: auto;
+    }
+
+    #admin-inbox-modal.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .admin-inbox-inner {
+      width: 780px;
+      max-width: 95vw;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .admin-inbox-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: rgba(20, 18, 30, 0.9);
+      border: 1px solid rgba(160, 140, 255, 0.15);
+      border-radius: 8px;
+    }
+
+    .admin-inbox-title {
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(160, 140, 255, 0.7);
+    }
+
+    .admin-inbox-count {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: rgba(200, 195, 230, 0.4);
+    }
+
+    .admin-inbox-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid rgba(160, 140, 255, 0.2);
+      background: transparent;
+      color: rgba(200, 195, 230, 0.5);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .admin-inbox-close:hover {
+      background: rgba(160, 140, 255, 0.15);
+      color: #e0e0f0;
+    }
+
+    .admin-msg-card {
+      padding: 20px;
+      background: rgba(20, 18, 30, 0.85);
+      border: 1px solid rgba(160, 140, 255, 0.1);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: border-color 0.3s;
+    }
+
+    .admin-msg-card:hover {
+      border-color: rgba(160, 140, 255, 0.25);
+    }
+
+    .admin-msg-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .admin-msg-sender {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      font-weight: 500;
+      color: #e8c47c;
+    }
+
+    .admin-msg-time {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: rgba(200, 195, 230, 0.35);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .admin-msg-email {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: rgba(160, 200, 255, 0.6);
+    }
+
+    .admin-msg-body {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.7;
+      color: #e0dcd0;
+      padding: 12px 16px;
+      background: rgba(255, 240, 210, 0.02);
+      border-left: 2px solid rgba(232, 196, 124, 0.15);
+      border-radius: 0 4px 4px 0;
+    }
+
+    .admin-msg-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: rgba(200, 195, 230, 0.3);
+    }
+
+    .admin-msg-meta span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .admin-msg-meta-label {
+      color: rgba(160, 140, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .admin-msg-delete {
+      padding: 5px 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      border: 1px solid rgba(200, 80, 60, 0.3);
+      border-radius: 4px;
+      background: rgba(200, 80, 60, 0.08);
+      color: rgba(200, 80, 60, 0.6);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .admin-msg-delete:hover {
+      background: rgba(200, 80, 60, 0.2);
+      border-color: rgba(200, 80, 60, 0.5);
+      color: rgba(220, 100, 80, 0.9);
+    }
+
+    .admin-msg-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .admin-inbox-empty {
+      text-align: center;
+      padding: 60px 20px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      font-style: italic;
+      color: rgba(200, 195, 230, 0.3);
+    }
+
+    .admin-inbox-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 12px;
+    }
+
+    .admin-inbox-pagination button {
+      padding: 8px 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      border: 1px solid rgba(160, 140, 255, 0.2);
+      border-radius: 4px;
+      background: rgba(160, 140, 255, 0.05);
+      color: rgba(160, 140, 255, 0.6);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .admin-inbox-pagination button:hover:not(:disabled) {
+      background: rgba(160, 140, 255, 0.15);
+    }
+
+    .admin-inbox-pagination button:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+    }
+
+    .admin-inbox-pagination span {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: rgba(200, 195, 230, 0.4);
+    }
   </style>
 </head>
 
@@ -976,6 +1333,7 @@
   <div id="debug-coords">cam: loading...</div>
   <button id="record-btn" onclick="startRecording()">● REC 7s</button>
   <a id="math-btn" href="#" target="_blank">⊞ MATH</a>
+  <button id="inbox-btn" onclick="openAdminLogin()">✉ INBOX</button>
 
   <!-- quality tier panel, dev mode only -->
   <div id="quality-panel">
@@ -1048,6 +1406,10 @@
           <input class="gb-input" type="text" id="gb-name" placeholder="optional" maxlength="50" autocomplete="off">
         </div>
         <div class="gb-field">
+          <label class="gb-label" for="gb-email">your email</label>
+          <input class="gb-input" type="email" id="gb-email" placeholder="optional — if you want a reply" maxlength="254" autocomplete="email">
+        </div>
+        <div class="gb-field">
           <label class="gb-label" for="gb-message">your words</label>
           <textarea class="gb-textarea" id="gb-message" placeholder="write something..." maxlength="500"></textarea>
         </div>
@@ -1059,6 +1421,32 @@
       </div>
 
       <div class="gb-ornament">· · ·</div>
+    </div>
+  </div>
+
+  <!-- Admin login modal -->
+  <div id="admin-login-modal">
+    <div class="admin-login-inner" style="position:relative;">
+      <button class="admin-login-close" onclick="closeAdminLogin()" aria-label="Close">&times;</button>
+      <div class="admin-login-title">admin access</div>
+      <input class="admin-login-input" type="password" id="admin-key-input" placeholder="enter admin key" autocomplete="off">
+      <button class="admin-login-submit" id="admin-login-submit" onclick="submitAdminLogin()">authenticate</button>
+      <div class="admin-login-status" id="admin-login-status"></div>
+    </div>
+  </div>
+
+  <!-- Admin inbox modal -->
+  <div id="admin-inbox-modal">
+    <div class="admin-inbox-inner">
+      <div class="admin-inbox-header">
+        <div>
+          <div class="admin-inbox-title">inbox</div>
+          <div class="admin-inbox-count" id="admin-inbox-count"></div>
+        </div>
+        <button class="admin-inbox-close" onclick="closeAdminInbox()" aria-label="Close">&times;</button>
+      </div>
+      <div id="admin-inbox-messages"></div>
+      <div class="admin-inbox-pagination" id="admin-inbox-pagination"></div>
     </div>
   </div>
 
@@ -1111,13 +1499,20 @@
       if (e.key === 'Escape') {
         closeCvModal();
         closeGuestbook();
+        if (typeof closeAdminLogin === 'function') closeAdminLogin();
+        if (typeof closeAdminInbox === 'function') closeAdminInbox();
       }
     });
   </script>
 
-  <!-- Guestbook handlers -->
+  <!-- Guestbook + Admin handlers -->
   <script>
     const GB_API = 'https://mathexercice.onrender.com/api/guestbook';
+
+    // ── Admin state ──
+    // token lives ONLY in JS memory — never persisted to localStorage/cookies.
+    // cleared automatically on page unload or when dev-mode is toggled off.
+    let __adminToken = null;
 
     function openGuestbook() {
       const modal = document.getElementById('guestbook-modal');
@@ -1129,6 +1524,7 @@
       });
       // reset form
       document.getElementById('gb-name').value = '';
+      document.getElementById('gb-email').value = '';
       document.getElementById('gb-message').value = '';
       document.getElementById('gb-char-count').textContent = '0 / 500';
       document.getElementById('gb-char-count').className = 'gb-char-count';
@@ -1166,6 +1562,7 @@
 
     async function sendGuestbook() {
       const nameEl = document.getElementById('gb-name');
+      const emailEl = document.getElementById('gb-email');
       const msgEl = document.getElementById('gb-message');
       const statusEl = document.getElementById('gb-status');
       const sendBtn = document.getElementById('gb-send');
@@ -1182,37 +1579,282 @@
       statusEl.className = 'gb-status';
 
       try {
+        const payload = {
+          name: nameEl.value.trim() || undefined,
+          email: emailEl.value.trim() || undefined,
+          message: message,
+        };
+
         const res = await fetch(GB_API, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: nameEl.value.trim() || undefined,
-            message: message,
-          }),
+          body: JSON.stringify(payload),
         });
 
         if (res.ok) {
-          statusEl.textContent = 'Sent — thank you!';
+          statusEl.textContent = 'Sent \u2014 thank you!';
           statusEl.className = 'gb-status success';
           msgEl.value = '';
           nameEl.value = '';
+          emailEl.value = '';
           document.getElementById('gb-char-count').textContent = '0 / 500';
           document.getElementById('gb-char-count').className = 'gb-char-count';
-          // keep disabled for a moment so they see the confirmation
           setTimeout(() => { sendBtn.disabled = false; }, 3000);
         } else {
-          const data = await res.json().catch(() => ({}));
-          statusEl.textContent = data.error || 'Something went wrong. Try again.';
+          let errMsg = 'Something went wrong. Try again.';
+          try {
+            const data = await res.json();
+            if (data.error) errMsg = data.error;
+          } catch (_) {}
+          statusEl.textContent = errMsg;
           statusEl.className = 'gb-status error';
           sendBtn.disabled = false;
         }
       } catch (err) {
-        statusEl.textContent = 'Network error. Try again.';
+        // CORS or network failure
+        console.error('[guestbook] network error:', err);
+        statusEl.textContent = 'Could not reach the server. Check your connection.';
         statusEl.className = 'gb-status error';
         sendBtn.disabled = false;
       }
     }
+
+    // ── Admin login modal ──
+    function openAdminLogin() {
+      if (__adminToken) {
+        loadInbox();
+        return;
+      }
+      const modal = document.getElementById('admin-login-modal');
+      modal.style.display = 'flex';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          modal.classList.add('open');
+          document.getElementById('admin-key-input').focus();
+        });
+      });
+      document.getElementById('admin-key-input').value = '';
+      document.getElementById('admin-login-status').textContent = '';
+    }
+
+    function closeAdminLogin() {
+      const modal = document.getElementById('admin-login-modal');
+      modal.classList.remove('open');
+      setTimeout(() => { modal.style.display = 'none'; }, 400);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const loginModal = document.getElementById('admin-login-modal');
+      loginModal.addEventListener('click', (e) => {
+        if (e.target === loginModal) closeAdminLogin();
+      });
+      document.getElementById('admin-key-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitAdminLogin();
+      });
+      const inboxModal = document.getElementById('admin-inbox-modal');
+      inboxModal.addEventListener('click', (e) => {
+        if (e.target === inboxModal) closeAdminInbox();
+      });
+    });
+
+    async function submitAdminLogin() {
+      const keyInput = document.getElementById('admin-key-input');
+      const statusEl = document.getElementById('admin-login-status');
+      const submitBtn = document.getElementById('admin-login-submit');
+      const key = keyInput.value.trim();
+
+      if (!key) {
+        statusEl.textContent = 'key is required';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      statusEl.textContent = 'verifying...';
+
+      try {
+        const res = await fetch(GB_API + '?limit=1', {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer ' + key },
+        });
+
+        if (res.ok) {
+          __adminToken = key;
+          statusEl.textContent = '';
+          closeAdminLogin();
+          keyInput.value = '';
+          loadInbox();
+        } else if (res.status === 401) {
+          statusEl.textContent = 'invalid key';
+          keyInput.value = '';
+          keyInput.focus();
+        } else {
+          statusEl.textContent = 'server error (' + res.status + ')';
+        }
+      } catch (err) {
+        statusEl.textContent = 'network error';
+      }
+      submitBtn.disabled = false;
+    }
+
+    // ── Admin inbox ──
+    let __inboxOffset = 0;
+    const __inboxLimit = 20;
+
+    async function loadInbox(offset) {
+      if (!__adminToken) { openAdminLogin(); return; }
+      if (offset !== undefined) __inboxOffset = offset;
+
+      const modal = document.getElementById('admin-inbox-modal');
+      const msgContainer = document.getElementById('admin-inbox-messages');
+      const countEl = document.getElementById('admin-inbox-count');
+      const pagEl = document.getElementById('admin-inbox-pagination');
+
+      modal.style.display = 'flex';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { modal.classList.add('open'); });
+      });
+
+      msgContainer.innerHTML = '<div class="admin-inbox-empty">loading...</div>';
+      pagEl.innerHTML = '';
+
+      try {
+        const res = await fetch(
+          GB_API + '?limit=' + __inboxLimit + '&offset=' + __inboxOffset,
+          { headers: { 'Authorization': 'Bearer ' + __adminToken } }
+        );
+
+        if (res.status === 401) {
+          __adminToken = null;
+          closeAdminInbox();
+          openAdminLogin();
+          document.getElementById('admin-login-status').textContent = 'session expired';
+          return;
+        }
+
+        if (!res.ok) {
+          msgContainer.innerHTML = '<div class="admin-inbox-empty">failed to load (' + res.status + ')</div>';
+          return;
+        }
+
+        const data = await res.json();
+        countEl.textContent = data.total + ' message' + (data.total !== 1 ? 's' : '');
+
+        if (data.messages.length === 0) {
+          msgContainer.innerHTML = '<div class="admin-inbox-empty">no messages yet</div>';
+          return;
+        }
+
+        msgContainer.innerHTML = data.messages.map(renderMessageCard).join('');
+
+        const totalPages = Math.ceil(data.total / __inboxLimit);
+        const currentPage = Math.floor(__inboxOffset / __inboxLimit) + 1;
+
+        if (totalPages > 1) {
+          pagEl.innerHTML =
+            '<button ' + (__inboxOffset <= 0 ? 'disabled' : '') +
+            ' onclick="loadInbox(' + Math.max(0, __inboxOffset - __inboxLimit) + ')">\u2190 prev</button>' +
+            '<span>' + currentPage + ' / ' + totalPages + '</span>' +
+            '<button ' + (__inboxOffset + __inboxLimit >= data.total ? 'disabled' : '') +
+            ' onclick="loadInbox(' + (__inboxOffset + __inboxLimit) + ')">next \u2192</button>';
+        }
+      } catch (err) {
+        console.error('[admin] inbox load error:', err);
+        msgContainer.innerHTML = '<div class="admin-inbox-empty">network error</div>';
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleString('en-CA', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+        timeZoneName: 'short',
+      });
+    }
+
+    function renderMessageCard(msg) {
+      const emailLine = msg.email
+        ? '<div class="admin-msg-email">\u2709 ' + escapeHtml(msg.email) + '</div>'
+        : '';
+
+      const meta = [];
+      if (msg.ipHash) meta.push('<span><span class="admin-msg-meta-label">ip:</span> ' + escapeHtml(msg.ipHash) + '</span>');
+      if (msg.userAgent) {
+        const shortUa = msg.userAgent.length > 80 ? msg.userAgent.slice(0, 80) + '\u2026' : msg.userAgent;
+        meta.push('<span><span class="admin-msg-meta-label">ua:</span> ' + escapeHtml(shortUa) + '</span>');
+      }
+      if (msg.referer) meta.push('<span><span class="admin-msg-meta-label">ref:</span> ' + escapeHtml(msg.referer) + '</span>');
+
+      return '<div class="admin-msg-card" data-msg-id="' + msg.id + '">' +
+        '<div class="admin-msg-top">' +
+          '<div class="admin-msg-sender">' + escapeHtml(msg.name) + '</div>' +
+          '<div class="admin-msg-time">' + formatDate(msg.createdAt) + '</div>' +
+        '</div>' +
+        emailLine +
+        '<div class="admin-msg-body">' + escapeHtml(msg.message) + '</div>' +
+        (meta.length > 0 ? '<div class="admin-msg-meta">' + meta.join('') + '</div>' : '') +
+        '<div class="admin-msg-actions">' +
+          '<button class="admin-msg-delete" onclick="deleteMessage(' + msg.id + ', this)">delete</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    async function deleteMessage(id, btn) {
+      if (!confirm('Delete message #' + id + '?')) return;
+      btn.disabled = true;
+      btn.textContent = '...';
+
+      try {
+        const res = await fetch(GB_API + '/' + id, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + __adminToken },
+        });
+
+        if (res.ok) {
+          const card = btn.closest('.admin-msg-card');
+          if (card) {
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(20px)';
+            card.style.transition = 'all 0.3s ease';
+            setTimeout(() => {
+              card.remove();
+              loadInbox(__inboxOffset);
+            }, 300);
+          }
+        } else if (res.status === 401) {
+          __adminToken = null;
+          closeAdminInbox();
+          openAdminLogin();
+        } else {
+          alert('Delete failed: ' + res.status);
+          btn.disabled = false;
+          btn.textContent = 'delete';
+        }
+      } catch (err) {
+        alert('Network error');
+        btn.disabled = false;
+        btn.textContent = 'delete';
+      }
+    }
+
+    function closeAdminInbox() {
+      const modal = document.getElementById('admin-inbox-modal');
+      modal.classList.remove('open');
+      setTimeout(() => { modal.style.display = 'none'; }, 400);
+    }
+
+    // wipe the admin token when the page unloads for security
+    window.addEventListener('beforeunload', () => {
+      __adminToken = null;
+    });
   </script>
+
 
   <!-- dirty script to grab cam coords for debugging -->
   <script>
@@ -1876,6 +2518,10 @@
           controls.enabled = false;
           hintsEl.classList.remove('visible');
           hintsEl.style.display = 'none';
+          // wipe admin session when leaving dev mode
+          if (typeof __adminToken !== 'undefined') __adminToken = null;
+          if (typeof closeAdminLogin === 'function') closeAdminLogin();
+          if (typeof closeAdminInbox === 'function') closeAdminInbox();
         }
         konamiBuffer = ''; // reset buffer
       }

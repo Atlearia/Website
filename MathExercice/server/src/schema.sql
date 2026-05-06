@@ -42,8 +42,11 @@ CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions (started_at);
 CREATE TABLE IF NOT EXISTS guestbook (
   id          BIGSERIAL PRIMARY KEY,
   name        TEXT DEFAULT 'Anonymous',
+  email       TEXT,
   message     TEXT NOT NULL,
   ip_hash     TEXT,
+  user_agent  TEXT,
+  referer     TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

@@ -59,6 +59,9 @@ const requireJson = (req: Request, res: Response, next: NextFunction): void => {
   next();
 };
 
+// basic email format check — intentionally lenient
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // POST /api/guestbook — public, anyone can leave a message
 router.post('/', requireJson, async (req: Request, res: Response) => {
   try {
@@ -66,7 +69,7 @@ router.post('/', requireJson, async (req: Request, res: Response) => {
 
     // reject unknown fields
     if (body) {
-      const allowedKeys = new Set(['name', 'message']);
+      const allowedKeys = new Set(['name', 'email', 'message']);
       const extraKeys = Object.keys(body).filter((k) => !allowedKeys.has(k));
       if (extraKeys.length > 0) {
         res.status(400).json({ error: 'Unexpected fields in request body.' });
@@ -102,11 +105,31 @@ router.post('/', requireJson, async (req: Request, res: Response) => {
       }
     }
 
+    // optional email — validate format if provided
+    let email: string | null = null;
+    if (body?.email !== undefined) {
+      if (typeof body.email !== 'string') {
+        res.status(400).json({ error: 'Email must be a string.' });
+        return;
+      }
+      const trimmedEmail = body.email.trim();
+      if (trimmedEmail.length > 0) {
+        if (!EMAIL_RE.test(trimmedEmail) || trimmedEmail.length > 254) {
+          res.status(400).json({ error: 'Invalid email format.' });
+          return;
+        }
+        email = sanitizeText(trimmedEmail).slice(0, 254);
+      }
+    }
+
     const ipHash = getHashedClientIp(req);
+    const userAgent = (req.headers['user-agent'] || '').slice(0, 512);
+    const referer = (req.headers['referer'] || req.headers['referrer'] || '').slice(0, 512);
 
     await pool.query(
-      `INSERT INTO guestbook (name, message, ip_hash) VALUES ($1, $2, $3)`,
-      [name, message, ipHash],
+      `INSERT INTO guestbook (name, email, message, ip_hash, user_agent, referer)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [name, email, message, ipHash, userAgent || null, referer || null],
     );
 
     res.status(201).json({ ok: true });
@@ -124,7 +147,7 @@ router.get('/', adminAuth, async (req: Request, res: Response) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, name, message, ip_hash, created_at
+      `SELECT id, name, email, message, ip_hash, user_agent, referer, created_at
        FROM guestbook
        ORDER BY created_at DESC
        LIMIT $1 OFFSET $2`,
@@ -137,8 +160,11 @@ router.get('/', adminAuth, async (req: Request, res: Response) => {
       messages: result.rows.map((r) => ({
         id: Number(r.id),
         name: r.name,
+        email: r.email || null,
         message: r.message,
         ipHash: r.ip_hash ? r.ip_hash.slice(0, 12) : null,
+        userAgent: r.user_agent || null,
+        referer: r.referer || null,
         createdAt: r.created_at,
       })),
       total: countResult.rows[0].total,
