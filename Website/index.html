@@ -1644,6 +1644,62 @@
     }
 
     // load the giant model
+    // shared helper — updates the dev panel with perf results.
+    // called from both perfUiPromise (fires as soon as analysis finishes)
+    // and the gltf callback (fires again once model loads with latest data).
+    function updatePerfPanel(perfResult) {
+      if (!perfResult) {
+        document.getElementById('qp-info').textContent = 'detection failed\nusing defaults';
+        return;
+      }
+      adaptedQuality = adaptForThreeJS({ tier: perfResult.tier, settings: perfResult.settings });
+      detectedTier = perfResult.tier;
+      if (ENABLE_ADAPTIVE_QUALITY) {
+        applyToRenderer(renderer, adaptedQuality);
+        MAX_TEX = adaptedQuality.textures.maxSize;
+      }
+
+      const gpu = perfResult.hardware.gpu || 'unknown';
+      const conf = (perfResult.confidence * 100).toFixed(1);
+      const bench = perfResult.benchmark ? `${perfResult.benchmark.fps} fps` : 'skipped';
+      const topMatch = perfResult.ragMatches?.[0];
+      const source = topMatch?.source?.type || 'hardware-index';
+      const exact = topMatch?.scores?.exact !== undefined ? `${(topMatch.scores.exact * 100).toFixed(0)}%` : 'n/a';
+      const corpus = perfResult.ragStats?.corpusSize || perfResult.ragContext?.corpus?.corpusSize || 0;
+      const profile = perfResult.renderProfile;
+      const matchLine = topMatch ? `\nretrieved: ${topMatch.exactModel || topMatch.id}\nmatch: ${(topMatch.similarity * 100).toFixed(0)}% | exact: ${exact}\nsource: ${source}` : '';
+      const profileLine = profile ? `\nprofile: ${profile.label} | tex ${profile.maxTextureSize} | dpr ${profile.pixelRatio}\nrender: aa ${profile.antialias ? 'on' : 'off'} | shadows ${profile.shadowsEnabled ? 'on' : 'off'} | fireflies ${profile.fireflyCount}` : '';
+      const whyLine = perfResult.reasoning ? `\nwhy: ${perfResult.reasoning}` : '';
+      const corpusLine = corpus ? `\ncorpus: ${corpus} GPU profiles` : '';
+      const mode = ENABLE_ADAPTIVE_QUALITY ? '\nmode: applied' : '\nmode: display only';
+      document.getElementById('qp-info').textContent =
+        `gpu: ${gpu}\nconf: ${conf}%\nbench: ${bench}${matchLine}${profileLine}${whyLine}${corpusLine}${mode}`;
+
+      if (ENABLE_ADAPTIVE_QUALITY) {
+        window.setQualityTier(perfResult.tier);
+      } else {
+        document.querySelectorAll('.qp-tier-btn').forEach(btn => {
+          btn.classList.toggle('active', parseInt(btn.dataset.tier) === perfResult.tier);
+        });
+        document.getElementById('qp-current').textContent =
+          `detected: tier ${perfResult.tier} (not applied)`;
+        document.getElementById('qp-auto-label').textContent =
+          'adaptive quality OFF';
+      }
+
+      console.log(
+        `[SystemPerfTracker] tier ${perfResult.tier} | gpu: ${gpu} | confidence: ${conf}% | ` +
+        (ENABLE_ADAPTIVE_QUALITY
+          ? `textures: ${MAX_TEX}px | particles: ${adaptedQuality.particles.fireflyCount}`
+          : 'adaptive quality disabled, display only')
+      );
+    }
+
+    // fire the panel as soon as analysis is done — usually before the GLB finishes downloading
+    const perfUiPromise = perfPromise.then(perfResult => {
+      updatePerfPanel(perfResult);
+      return perfResult;
+    });
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('/draco/');
 
@@ -1687,51 +1743,8 @@
         console.log('[ANIM-DEBUG] awaiting perfPromise...');
         const perfResult = await perfPromise;
         console.log('[ANIM-DEBUG] perfPromise resolved, result:', !!perfResult);
-        if (perfResult) {
-          adaptedQuality = adaptForThreeJS({ tier: perfResult.tier, settings: perfResult.settings });
-          detectedTier = perfResult.tier;
-
-          // only touch renderer settings if the kill switch is on
-          if (ENABLE_ADAPTIVE_QUALITY) {
-            applyToRenderer(renderer, adaptedQuality);
-            MAX_TEX = adaptedQuality.textures.maxSize;
-          }
-
-          // populate the admin panel with detection results regardless
-          const gpu = perfResult.hardware.gpu || 'unknown';
-          const conf = (perfResult.confidence * 100).toFixed(1);
-          const bench = perfResult.benchmark ? `${perfResult.benchmark.fps} fps` : 'skipped';
-          const mode = ENABLE_ADAPTIVE_QUALITY ? '' : '\nmode: display only';
-          document.getElementById('qp-info').textContent =
-            `gpu: ${gpu}\nconf: ${conf}%\nbench: ${bench}${mode}`;
-
-          // highlight detected tier in the panel but dont apply it
-          // unless the flag is on
-          if (ENABLE_ADAPTIVE_QUALITY) {
-            window.setQualityTier(perfResult.tier);
-          } else {
-            // just mark the detected tier visually without changing anything
-            document.querySelectorAll('.qp-tier-btn').forEach(btn => {
-              btn.classList.toggle('active', parseInt(btn.dataset.tier) === perfResult.tier);
-            });
-            document.getElementById('qp-current').textContent =
-              `detected: tier ${perfResult.tier} (not applied)`;
-            document.getElementById('qp-auto-label').textContent =
-              'adaptive quality OFF';
-          }
-
-          console.log(
-            `[SystemPerfTracker] tier ${perfResult.tier} | ` +
-            `gpu: ${gpu} | ` +
-            `confidence: ${conf}% | ` +
-            (ENABLE_ADAPTIVE_QUALITY
-              ? `textures: ${MAX_TEX}px | particles: ${adaptedQuality.particles.fireflyCount}`
-              : 'adaptive quality disabled, display only')
-          );
-        } else {
-          // perf tracker failed, panel still shows something useful
-          document.getElementById('qp-info').textContent = 'detection failed\nusing defaults';
-        }
+        // update the dev panel with detection results
+        updatePerfPanel(perfResult);
 
         // crunch textures using the (possibly updated) MAX_TEX limit
         shrinkAllTextures(model);
