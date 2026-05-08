@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import apiRouter from './routes.js';
 import adminRouter from './adminRoutes.js';
 import guestbookRouter from './guestbookRoutes.js';
+import visitorLogRouter from './visitorRoutes.js';
 import pool from './db.js';
 import { ensureIpHashKey } from './ipHash.js';
 import { runRetentionCleanup, scheduleRetentionCleanup } from './retention.js';
@@ -95,6 +96,14 @@ const guestbookLimiter = rateLimit({
   message: { error: 'Too many messages. Try again in a few minutes.' },
 });
 
+const visitorBeaconLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests.' },
+});
+
 app.use('/api', generalLimiter);
 app.use('/api/register-anon', registerLimiter);
 app.use('/api/attempt', attemptLimiter);
@@ -103,6 +112,7 @@ app.use('/api/attempt', attemptLimiter);
 app.use('/api', apiRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/guestbook', guestbookLimiter, guestbookRouter);
+app.use('/api/visitor-log', visitorBeaconLimiter, visitorLogRouter);
 
 // health check
 app.get('/health', async (_req, res) => {

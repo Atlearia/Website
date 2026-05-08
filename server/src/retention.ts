@@ -35,8 +35,14 @@ export async function runRetentionCleanup(): Promise<void> {
     );
     const sessDeleted = sessResult.rowCount ?? 0;
 
+    const visitResult = await pool.query(
+      `DELETE FROM visitor_log WHERE created_at < $1`,
+      [cutoff],
+    );
+    const visitDeleted = visitResult.rowCount ?? 0;
+
     console.log(
-      `[retention] done: ${attDeleted} attempts, ${sessDeleted} sessions removed`,
+      `[retention] done: ${attDeleted} attempts, ${sessDeleted} sessions, ${visitDeleted} visitor logs removed`,
     );
   } catch (err) {
     console.error('[retention] cleanup error:', err);

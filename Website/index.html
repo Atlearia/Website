@@ -219,7 +219,7 @@
     #debug-coords,
     #record-btn,
     #math-btn,
-    #inbox-btn,
+    #log-btn,
     #quality-panel,
     #controls-hint {
       display: none;
@@ -228,7 +228,7 @@
     body.dev-mode #debug-coords,
     body.dev-mode #record-btn,
     body.dev-mode #math-btn,
-    body.dev-mode #inbox-btn,
+    body.dev-mode #log-btn,
     body.dev-mode #quality-panel {
       display: block;
     }
@@ -960,8 +960,8 @@
       }
     }
 
-    /* ── Inbox button (dev mode) ── */
-    #inbox-btn {
+    /* ── Log button (dev mode) ── */
+    #log-btn {
       position: fixed;
       top: 16px;
       left: 540px;
@@ -977,7 +977,7 @@
       transition: all 0.2s;
     }
 
-    #inbox-btn:hover {
+    #log-btn:hover {
       background: rgba(60, 255, 120, 0.3);
     }
 
@@ -1095,8 +1095,8 @@
       color: #e0e0f0;
     }
 
-    /* ── Admin inbox modal ── */
-    #admin-inbox-modal {
+    /* ── Admin visitor log modal ── */
+    #admin-log-modal {
       position: fixed;
       inset: 0;
       z-index: 3000;
@@ -1112,20 +1112,20 @@
       overflow-y: auto;
     }
 
-    #admin-inbox-modal.open {
+    #admin-log-modal.open {
       display: flex;
       opacity: 1;
     }
 
-    .admin-inbox-inner {
-      width: 780px;
+    .admin-log-inner {
+      width: 900px;
       max-width: 95vw;
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
 
-    .admin-inbox-header {
+    .admin-log-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1135,7 +1135,7 @@
       border-radius: 8px;
     }
 
-    .admin-inbox-title {
+    .admin-log-title {
       font-family: 'Courier New', monospace;
       font-size: 14px;
       letter-spacing: 3px;
@@ -1143,13 +1143,13 @@
       color: rgba(160, 140, 255, 0.7);
     }
 
-    .admin-inbox-count {
+    .admin-log-count {
       font-family: 'Courier New', monospace;
       font-size: 11px;
       color: rgba(200, 195, 230, 0.4);
     }
 
-    .admin-inbox-close {
+    .admin-log-close {
       width: 32px;
       height: 32px;
       border-radius: 50%;
@@ -1164,114 +1164,203 @@
       transition: all 0.2s;
     }
 
-    .admin-inbox-close:hover {
+    .admin-log-close:hover {
       background: rgba(160, 140, 255, 0.15);
       color: #e0e0f0;
     }
 
-    .admin-msg-card {
-      padding: 20px;
+    /* visitor card */
+    .visitor-card {
       background: rgba(20, 18, 30, 0.85);
       border: 1px solid rgba(160, 140, 255, 0.1);
       border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      overflow: hidden;
       transition: border-color 0.3s;
     }
 
-    .admin-msg-card:hover {
+    .visitor-card:hover {
       border-color: rgba(160, 140, 255, 0.25);
     }
 
-    .admin-msg-top {
+    .visitor-card-header {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
+      padding: 14px 20px;
+      background: rgba(160, 140, 255, 0.04);
+      border-bottom: 1px solid rgba(160, 140, 255, 0.06);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .visitor-card-header:hover {
+      background: rgba(160, 140, 255, 0.08);
+    }
+
+    .visitor-id-row {
+      display: flex;
+      align-items: center;
       gap: 12px;
     }
 
-    .admin-msg-sender {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 18px;
-      font-weight: 500;
-      color: #e8c47c;
+    .visitor-ip {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #a08cff;
+      letter-spacing: 0.5px;
     }
 
-    .admin-msg-time {
+    .visitor-badge {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      background: rgba(160, 140, 255, 0.12);
+      color: rgba(160, 140, 255, 0.6);
+      letter-spacing: 0.5px;
+    }
+
+    .visitor-badge.has-msg {
+      background: rgba(232, 196, 124, 0.12);
+      color: rgba(232, 196, 124, 0.7);
+    }
+
+    .visitor-location {
       font-family: 'Courier New', monospace;
       font-size: 10px;
       color: rgba(200, 195, 230, 0.35);
-      white-space: nowrap;
-      flex-shrink: 0;
     }
 
-    .admin-msg-email {
+    .visitor-meta-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .visitor-visits {
       font-family: 'Courier New', monospace;
       font-size: 11px;
-      color: rgba(160, 200, 255, 0.6);
+      color: rgba(200, 195, 230, 0.5);
     }
 
-    .admin-msg-body {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 16px;
-      font-weight: 400;
-      line-height: 1.7;
-      color: #e0dcd0;
-      padding: 12px 16px;
+    .visitor-lastseen {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      color: rgba(200, 195, 230, 0.25);
+    }
+
+    /* expandable detail body */
+    .visitor-card-body {
+      display: none;
+      padding: 0 20px 16px;
+    }
+
+    .visitor-card.expanded .visitor-card-body {
+      display: block;
+    }
+
+    .visitor-card.expanded .visitor-card-header {
+      border-bottom-color: rgba(160, 140, 255, 0.12);
+    }
+
+    .visitor-section {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(160, 140, 255, 0.04);
+    }
+
+    .visitor-section:last-child {
+      border-bottom: none;
+    }
+
+    .visitor-section-title {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(160, 140, 255, 0.35);
+      margin-bottom: 8px;
+    }
+
+    .visitor-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 6px 16px;
+    }
+
+    .visitor-field {
+      display: flex;
+      gap: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      line-height: 1.6;
+    }
+
+    .visitor-field-label {
+      color: rgba(160, 140, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+      min-width: 50px;
+    }
+
+    .visitor-field-value {
+      color: rgba(200, 195, 230, 0.7);
+      word-break: break-all;
+    }
+
+    /* messages within visitor card */
+    .visitor-msg {
+      padding: 10px 14px;
+      margin-top: 6px;
       background: rgba(255, 240, 210, 0.02);
       border-left: 2px solid rgba(232, 196, 124, 0.15);
       border-radius: 0 4px 4px 0;
     }
 
-    .admin-msg-meta {
+    .visitor-msg-header {
       display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .visitor-msg-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e8c47c;
+    }
+
+    .visitor-msg-time {
       font-family: 'Courier New', monospace;
-      font-size: 10px;
+      font-size: 9px;
       color: rgba(200, 195, 230, 0.3);
     }
 
-    .admin-msg-meta span {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .admin-msg-meta-label {
-      color: rgba(160, 140, 255, 0.4);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
-    .admin-msg-delete {
-      padding: 5px 12px;
+    .visitor-msg-email {
       font-family: 'Courier New', monospace;
       font-size: 10px;
-      letter-spacing: 1px;
-      border: 1px solid rgba(200, 80, 60, 0.3);
-      border-radius: 4px;
-      background: rgba(200, 80, 60, 0.08);
-      color: rgba(200, 80, 60, 0.6);
-      cursor: pointer;
-      transition: all 0.2s;
+      color: rgba(160, 200, 255, 0.5);
+      margin-bottom: 4px;
     }
 
-    .admin-msg-delete:hover {
-      background: rgba(200, 80, 60, 0.2);
-      border-color: rgba(200, 80, 60, 0.5);
-      color: rgba(220, 100, 80, 0.9);
+    .visitor-msg-body {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #e0dcd0;
     }
 
-    .admin-msg-actions {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 8px;
+    /* user agent (full width, collapsible) */
+    .visitor-ua {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      color: rgba(200, 195, 230, 0.25);
+      word-break: break-all;
+      line-height: 1.5;
     }
 
-    .admin-inbox-empty {
+    .admin-log-empty {
       text-align: center;
       padding: 60px 20px;
       font-family: 'Cormorant Garamond', serif;
@@ -1280,7 +1369,7 @@
       color: rgba(200, 195, 230, 0.3);
     }
 
-    .admin-inbox-pagination {
+    .admin-log-pagination {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1288,7 +1377,7 @@
       padding: 12px;
     }
 
-    .admin-inbox-pagination button {
+    .admin-log-pagination button {
       padding: 8px 16px;
       font-family: 'Courier New', monospace;
       font-size: 11px;
@@ -1300,16 +1389,16 @@
       transition: all 0.2s;
     }
 
-    .admin-inbox-pagination button:hover:not(:disabled) {
+    .admin-log-pagination button:hover:not(:disabled) {
       background: rgba(160, 140, 255, 0.15);
     }
 
-    .admin-inbox-pagination button:disabled {
+    .admin-log-pagination button:disabled {
       opacity: 0.25;
       cursor: not-allowed;
     }
 
-    .admin-inbox-pagination span {
+    .admin-log-pagination span {
       font-family: 'Courier New', monospace;
       font-size: 11px;
       color: rgba(200, 195, 230, 0.4);
@@ -1333,7 +1422,7 @@
   <div id="debug-coords">cam: loading...</div>
   <button id="record-btn" onclick="startRecording()">● REC 7s</button>
   <a id="math-btn" href="#" target="_blank">⊞ MATH</a>
-  <button id="inbox-btn" onclick="openAdminLogin()">✉ INBOX</button>
+  <button id="log-btn" onclick="openAdminLogin()">📋 LOG</button>
 
   <!-- quality tier panel, dev mode only -->
   <div id="quality-panel">
@@ -1435,18 +1524,18 @@
     </div>
   </div>
 
-  <!-- Admin inbox modal -->
-  <div id="admin-inbox-modal">
-    <div class="admin-inbox-inner">
-      <div class="admin-inbox-header">
+  <!-- Admin visitor log modal -->
+  <div id="admin-log-modal">
+    <div class="admin-log-inner">
+      <div class="admin-log-header">
         <div>
-          <div class="admin-inbox-title">inbox</div>
-          <div class="admin-inbox-count" id="admin-inbox-count"></div>
+          <div class="admin-log-title">visitor log</div>
+          <div class="admin-log-count" id="admin-log-count"></div>
         </div>
-        <button class="admin-inbox-close" onclick="closeAdminInbox()" aria-label="Close">&times;</button>
+        <button class="admin-log-close" onclick="closeVisitorLog()" aria-label="Close">&times;</button>
       </div>
-      <div id="admin-inbox-messages"></div>
-      <div class="admin-inbox-pagination" id="admin-inbox-pagination"></div>
+      <div id="admin-log-visitors"></div>
+      <div class="admin-log-pagination" id="admin-log-pagination"></div>
     </div>
   </div>
 
@@ -1500,7 +1589,7 @@
         closeCvModal();
         closeGuestbook();
         if (typeof closeAdminLogin === 'function') closeAdminLogin();
-        if (typeof closeAdminInbox === 'function') closeAdminInbox();
+        if (typeof closeVisitorLog === 'function') closeVisitorLog();
       }
     });
   </script>
@@ -1622,7 +1711,7 @@
     // ── Admin login modal ──
     function openAdminLogin() {
       if (__adminToken) {
-        loadInbox();
+        loadVisitorLog();
         return;
       }
       const modal = document.getElementById('admin-login-modal');
@@ -1651,9 +1740,9 @@
       document.getElementById('admin-key-input').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') submitAdminLogin();
       });
-      const inboxModal = document.getElementById('admin-inbox-modal');
-      inboxModal.addEventListener('click', (e) => {
-        if (e.target === inboxModal) closeAdminInbox();
+      const logModal = document.getElementById('admin-log-modal');
+      logModal.addEventListener('click', (e) => {
+        if (e.target === logModal) closeVisitorLog();
       });
     });
 
@@ -1682,7 +1771,7 @@
           statusEl.textContent = '';
           closeAdminLogin();
           keyInput.value = '';
-          loadInbox();
+          loadVisitorLog();
         } else if (res.status === 401) {
           statusEl.textContent = 'invalid key';
           keyInput.value = '';
@@ -1696,165 +1785,141 @@
       submitBtn.disabled = false;
     }
 
-    // ── Admin inbox ──
-    let __inboxOffset = 0;
-    const __inboxLimit = 20;
+    // ── Visitor log ──
+    const VL_API = 'https://ningye-api.onrender.com/api/visitor-log';
+    let __logOffset = 0;
+    const __logLimit = 30;
 
-    async function loadInbox(offset) {
+    async function loadVisitorLog(offset) {
       if (!__adminToken) { openAdminLogin(); return; }
-      if (offset !== undefined) __inboxOffset = offset;
+      if (offset !== undefined) __logOffset = offset;
 
-      const modal = document.getElementById('admin-inbox-modal');
-      const msgContainer = document.getElementById('admin-inbox-messages');
-      const countEl = document.getElementById('admin-inbox-count');
-      const pagEl = document.getElementById('admin-inbox-pagination');
+      const modal = document.getElementById('admin-log-modal');
+      const container = document.getElementById('admin-log-visitors');
+      const countEl = document.getElementById('admin-log-count');
+      const pagEl = document.getElementById('admin-log-pagination');
 
       modal.style.display = 'flex';
       requestAnimationFrame(() => {
         requestAnimationFrame(() => { modal.classList.add('open'); });
       });
 
-      msgContainer.innerHTML = '<div class="admin-inbox-empty">loading...</div>';
+      container.innerHTML = '<div class="admin-log-empty">loading...</div>';
       pagEl.innerHTML = '';
 
       try {
         const res = await fetch(
-          GB_API + '?limit=' + __inboxLimit + '&offset=' + __inboxOffset,
+          VL_API + '?limit=' + __logLimit + '&offset=' + __logOffset,
           { headers: { 'Authorization': 'Bearer ' + __adminToken } }
         );
 
         if (res.status === 401) {
           __adminToken = null;
-          closeAdminInbox();
+          closeVisitorLog();
           openAdminLogin();
           document.getElementById('admin-login-status').textContent = 'session expired';
           return;
         }
 
         if (!res.ok) {
-          msgContainer.innerHTML = '<div class="admin-inbox-empty">failed to load (' + res.status + ')</div>';
+          container.innerHTML = '<div class="admin-log-empty">failed to load (' + res.status + ')</div>';
           return;
         }
 
         const data = await res.json();
-        countEl.textContent = data.total + ' message' + (data.total !== 1 ? 's' : '');
+        countEl.textContent = data.total + ' unique visitor' + (data.total !== 1 ? 's' : '');
 
-        if (data.messages.length === 0) {
-          msgContainer.innerHTML = '<div class="admin-inbox-empty">no messages yet</div>';
+        if (data.visitors.length === 0) {
+          container.innerHTML = '<div class="admin-log-empty">no visitors recorded yet</div>';
           return;
         }
 
-        msgContainer.innerHTML = data.messages.map(renderMessageCard).join('');
+        container.innerHTML = data.visitors.map(renderVisitorCard).join('');
 
-        const totalPages = Math.ceil(data.total / __inboxLimit);
-        const currentPage = Math.floor(__inboxOffset / __inboxLimit) + 1;
+        const totalPages = Math.ceil(data.total / __logLimit);
+        const currentPage = Math.floor(__logOffset / __logLimit) + 1;
 
         if (totalPages > 1) {
           pagEl.innerHTML =
-            '<button ' + (__inboxOffset <= 0 ? 'disabled' : '') +
-            ' onclick="loadInbox(' + Math.max(0, __inboxOffset - __inboxLimit) + ')">\u2190 prev</button>' +
+            '<button ' + (__logOffset <= 0 ? 'disabled' : '') +
+            ' onclick="loadVisitorLog(' + Math.max(0, __logOffset - __logLimit) + ')">\u2190 prev</button>' +
             '<span>' + currentPage + ' / ' + totalPages + '</span>' +
-            '<button ' + (__inboxOffset + __inboxLimit >= data.total ? 'disabled' : '') +
-            ' onclick="loadInbox(' + (__inboxOffset + __inboxLimit) + ')">next \u2192</button>';
+            '<button ' + (__logOffset + __logLimit >= data.total ? 'disabled' : '') +
+            ' onclick="loadVisitorLog(' + (__logOffset + __logLimit) + ')">next \u2192</button>';
         }
       } catch (err) {
-        console.error('[admin] inbox load error:', err);
-        msgContainer.innerHTML = '<div class="admin-inbox-empty">network error</div>';
+        console.error('[admin] visitor log error:', err);
+        container.innerHTML = '<div class="admin-log-empty">network error</div>';
       }
     }
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    function renderVisitorCard(v) {
+      var loc = [v.location.city, v.location.region, v.location.country].filter(Boolean).join(', ');
+      var locLine = loc ? '<div class="visitor-location">' + escapeHtml(loc) + '</div>' : '';
+      var msgBadge = v.messages.length > 0
+        ? '<span class="visitor-badge has-msg">' + v.messages.length + ' msg' + (v.messages.length > 1 ? 's' : '') + '</span>' : '';
+
+      var hw = v.hardware, hwFields = [];
+      if (hw.gpuRenderer) hwFields.push(vField('gpu', hw.gpuRenderer));
+      if (hw.gpuVendor) hwFields.push(vField('vendor', hw.gpuVendor));
+      if (hw.deviceMemory) hwFields.push(vField('ram', hw.deviceMemory + ' GB'));
+      if (hw.coreCount) hwFields.push(vField('cores', hw.coreCount));
+      if (hw.deviceType) hwFields.push(vField('type', hw.deviceType));
+      if (hw.screenWidth && hw.screenHeight) hwFields.push(vField('screen', hw.screenWidth + 'x' + hw.screenHeight + (hw.pixelRatio ? ' @' + hw.pixelRatio + 'x' : '')));
+      if (hw.connection) hwFields.push(vField('conn', hw.connection));
+      if (hw.webglVersion) hwFields.push(vField('webgl', 'v' + hw.webglVersion));
+
+      var locFields = [];
+      if (v.location.city) locFields.push(vField('city', v.location.city));
+      if (v.location.region) locFields.push(vField('region', v.location.region));
+      if (v.location.country) locFields.push(vField('country', v.location.country));
+      if (v.location.timezone) locFields.push(vField('tz', v.location.timezone));
+      if (v.location.isp) locFields.push(vField('isp', v.location.isp));
+
+      var msgsHtml = v.messages.map(function(m) {
+        var emailLine = m.email ? '<div class="visitor-msg-email">' + escapeHtml(m.email) + '</div>' : '';
+        return '<div class="visitor-msg"><div class="visitor-msg-header"><span class="visitor-msg-name">' +
+          escapeHtml(m.name || 'Anonymous') + '</span><span class="visitor-msg-time">' +
+          formatDate(m.createdAt) + '</span></div>' + emailLine +
+          '<div class="visitor-msg-body">' + escapeHtml(m.message) + '</div></div>';
+      }).join('');
+
+      var uaLine = v.userAgent
+        ? '<div class="visitor-section"><div class="visitor-section-title">user agent</div><div class="visitor-ua">' + escapeHtml(v.userAgent) + '</div></div>' : '';
+
+      return '<div class="visitor-card"><div class="visitor-card-header" onclick="toggleVisitorCard(this)"><div>' +
+        '<div class="visitor-id-row"><span class="visitor-ip">' + escapeHtml(v.ipHash) + '</span>' +
+        '<span class="visitor-badge">' + v.visitCount + ' visit' + (v.visitCount > 1 ? 's' : '') + '</span>' +
+        msgBadge + '</div>' + locLine + '</div>' +
+        '<div class="visitor-meta-right"><span class="visitor-visits">last: ' + formatDate(v.lastSeen) + '</span>' +
+        '<span class="visitor-lastseen">first: ' + formatDate(v.firstSeen) + '</span></div></div>' +
+        '<div class="visitor-card-body">' +
+        (hwFields.length > 0 ? '<div class="visitor-section"><div class="visitor-section-title">hardware</div><div class="visitor-grid">' + hwFields.join('') + '</div></div>' : '') +
+        (locFields.length > 0 ? '<div class="visitor-section"><div class="visitor-section-title">location</div><div class="visitor-grid">' + locFields.join('') + '</div></div>' : '') +
+        (msgsHtml ? '<div class="visitor-section"><div class="visitor-section-title">messages</div>' + msgsHtml + '</div>' : '') +
+        uaLine + '</div></div>';
     }
 
-    function formatDate(iso) {
-      if (!iso) return '';
-      const d = new Date(iso);
-      return d.toLocaleString('en-CA', {
-        year: 'numeric', month: 'short', day: 'numeric',
-        hour: '2-digit', minute: '2-digit', hour12: false,
-        timeZoneName: 'short',
-      });
+    function vField(label, value) {
+      return '<div class="visitor-field"><span class="visitor-field-label">' + label + '</span><span class="visitor-field-value">' + escapeHtml(String(value)) + '</span></div>';
     }
 
-    function renderMessageCard(msg) {
-      const emailLine = msg.email
-        ? '<div class="admin-msg-email">\u2709 ' + escapeHtml(msg.email) + '</div>'
-        : '';
-
-      const meta = [];
-      if (msg.ipHash) meta.push('<span><span class="admin-msg-meta-label">ip:</span> ' + escapeHtml(msg.ipHash) + '</span>');
-      if (msg.userAgent) {
-        const shortUa = msg.userAgent.length > 80 ? msg.userAgent.slice(0, 80) + '\u2026' : msg.userAgent;
-        meta.push('<span><span class="admin-msg-meta-label">ua:</span> ' + escapeHtml(shortUa) + '</span>');
-      }
-      if (msg.referer) meta.push('<span><span class="admin-msg-meta-label">ref:</span> ' + escapeHtml(msg.referer) + '</span>');
-
-      return '<div class="admin-msg-card" data-msg-id="' + msg.id + '">' +
-        '<div class="admin-msg-top">' +
-          '<div class="admin-msg-sender">' + escapeHtml(msg.name) + '</div>' +
-          '<div class="admin-msg-time">' + formatDate(msg.createdAt) + '</div>' +
-        '</div>' +
-        emailLine +
-        '<div class="admin-msg-body">' + escapeHtml(msg.message) + '</div>' +
-        (meta.length > 0 ? '<div class="admin-msg-meta">' + meta.join('') + '</div>' : '') +
-        '<div class="admin-msg-actions">' +
-          '<button class="admin-msg-delete" onclick="deleteMessage(' + msg.id + ', this)">delete</button>' +
-        '</div>' +
-      '</div>';
+    function toggleVisitorCard(headerEl) {
+      headerEl.closest('.visitor-card').classList.toggle('expanded');
     }
 
-    async function deleteMessage(id, btn) {
-      if (!confirm('Delete message #' + id + '?')) return;
-      btn.disabled = true;
-      btn.textContent = '...';
-
-      try {
-        const res = await fetch(GB_API + '/' + id, {
-          method: 'DELETE',
-          headers: { 'Authorization': 'Bearer ' + __adminToken },
-        });
-
-        if (res.ok) {
-          const card = btn.closest('.admin-msg-card');
-          if (card) {
-            card.style.opacity = '0';
-            card.style.transform = 'translateX(20px)';
-            card.style.transition = 'all 0.3s ease';
-            setTimeout(() => {
-              card.remove();
-              loadInbox(__inboxOffset);
-            }, 300);
-          }
-        } else if (res.status === 401) {
-          __adminToken = null;
-          closeAdminInbox();
-          openAdminLogin();
-        } else {
-          alert('Delete failed: ' + res.status);
-          btn.disabled = false;
-          btn.textContent = 'delete';
-        }
-      } catch (err) {
-        alert('Network error');
-        btn.disabled = false;
-        btn.textContent = 'delete';
-      }
-    }
-
-    function closeAdminInbox() {
-      const modal = document.getElementById('admin-inbox-modal');
+    function closeVisitorLog() {
+      var modal = document.getElementById('admin-log-modal');
       modal.classList.remove('open');
-      setTimeout(() => { modal.style.display = 'none'; }, 400);
+      setTimeout(function() { modal.style.display = 'none'; }, 400);
     }
 
     // wipe the admin token when the page unloads for security
-    window.addEventListener('beforeunload', () => {
+    window.addEventListener('beforeunload', function() {
       __adminToken = null;
     });
-  </script>
 
+  </script>
 
   <!-- dirty script to grab cam coords for debugging -->
   <script>
@@ -2342,6 +2407,33 @@
       updatePerfPanel(perfResult);
       return perfResult;
     });
+
+    // ── Visitor beacon — log hardware fingerprint on every page load ──
+    perfPromise.then(perfResult => {
+      if (!perfResult) return;
+      const hw = perfResult.hardware || {};
+      const payload = {
+        gpuRenderer: hw.gpu || null,
+        gpuVendor: hw.vendor || null,
+        deviceMemory: hw.memory || null,
+        coreCount: hw.cores || null,
+        deviceType: hw.deviceType || null,
+        screenWidth: hw.screen?.width || screen.width || null,
+        screenHeight: hw.screen?.height || screen.height || null,
+        pixelRatio: hw.screen?.pixelRatio || window.devicePixelRatio || null,
+        colorDepth: hw.screen?.colorDepth || screen.colorDepth || null,
+        connection: hw.connection?.effectiveType || null,
+        webglVersion: hw.webglVersion || null,
+        batteryLevel: hw.battery?.level ?? null,
+        batteryCharging: hw.battery?.charging ?? null,
+      };
+      // fire-and-forget, no blocking
+      fetch('https://ningye-api.onrender.com/api/visitor-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => { /* silently ignore failures */ });
+    });
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('/draco/');
 
@@ -2367,7 +2459,7 @@
       // assumes MathExercice vite dev server runs on :5173
       mathBtn.href = 'http://localhost:5173';
     } else {
-      mathBtn.href = '/math';
+      mathBtn.href = '/math/';
     }
 
     let mixer;
@@ -2521,7 +2613,7 @@
           // wipe admin session when leaving dev mode
           if (typeof __adminToken !== 'undefined') __adminToken = null;
           if (typeof closeAdminLogin === 'function') closeAdminLogin();
-          if (typeof closeAdminInbox === 'function') closeAdminInbox();
+          if (typeof closeVisitorLog === 'function') closeVisitorLog();
         }
         konamiBuffer = ''; // reset buffer
       }
