@@ -1,0 +1,20 @@
+# server secrets — only .env.example should be committed
+server/.env
+server/.env.local
+server/.env.*.local
+
+# keep example env
+!server/.env.example
+
+# dependencies
+server/node_modules/
+MathExercice/node_modules/
+Website/node_modules/
+
+# build output
+server/dist/
+
+# OS junk
+.DS_Store
+Thumbs.db
+Desktop.ini

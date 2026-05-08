@@ -9,11 +9,9 @@ dist/
 .env
 .env.local
 .env.*.local
-server/.env
 
 # keep example env files
 !.env.example
-!server/.env.example
 
 # OS files
 .DS_Store
