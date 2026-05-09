@@ -3,9 +3,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import apiRouter from './routes.js';
 import adminRouter from './adminRoutes.js';
 import guestbookRouter from './guestbookRoutes.js';
@@ -127,18 +124,8 @@ app.get('/health', async (_req, res) => {
   }
 });
 
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
-
-  try {
-    // Automatically apply schema.sql on boot
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
-    await pool.query(schemaSql);
-    console.log('Database schema verified/updated.');
-  } catch (err) {
-    console.error('Failed to run schema.sql:', err);
-  }
 
   // clean old data on boot, then daily
   runRetentionCleanup().catch((err: unknown) =>
