@@ -1863,6 +1863,14 @@
         .replace(/'/g, "&#039;");
     }
 
+    function formatDate(dateString) {
+      if (!dateString) return 'Never';
+      const d = new Date(dateString);
+      return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString(undefined, { 
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+      });
+    }
+
     function renderVisitorCard(v) {
       var loc = [v.location.city, v.location.region, v.location.country].filter(Boolean).join(', ');
       var locLine = loc ? '<div class="visitor-location">' + escapeHtml(loc) + '</div>' : '';
