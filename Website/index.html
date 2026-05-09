@@ -1518,7 +1518,7 @@
     <div class="admin-login-inner" style="position:relative;">
       <button class="admin-login-close" onclick="closeAdminLogin()" aria-label="Close">&times;</button>
       <div class="admin-login-title">admin access</div>
-      <input class="admin-login-input" type="password" id="admin-key-input" placeholder="enter admin key" autocomplete="off">
+      <input class="admin-login-input" type="text" id="admin-key-input" placeholder="enter admin key" autocomplete="off" style="-webkit-text-security: disc;">
       <button class="admin-login-submit" id="admin-login-submit" onclick="submitAdminLogin()">authenticate</button>
       <div class="admin-login-status" id="admin-login-status"></div>
     </div>
