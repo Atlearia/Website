@@ -1496,7 +1496,8 @@
         </div>
         <div class="gb-field">
           <label class="gb-label" for="gb-email">your email</label>
-          <input class="gb-input" type="email" id="gb-email" placeholder="optional — if you want a reply" maxlength="254" autocomplete="email">
+          <input class="gb-input" type="email" id="gb-email" placeholder="optional — if you want a reply"
+            maxlength="254" autocomplete="email">
         </div>
         <div class="gb-field">
           <label class="gb-label" for="gb-message">your words</label>
@@ -1518,7 +1519,8 @@
     <div class="admin-login-inner" style="position:relative;">
       <button class="admin-login-close" onclick="closeAdminLogin()" aria-label="Close">&times;</button>
       <div class="admin-login-title">admin access</div>
-      <input class="admin-login-input" type="text" id="admin-key-input" placeholder="enter admin key" autocomplete="off" style="-webkit-text-security: disc;">
+      <input class="admin-login-input" type="text" id="admin-key-input" placeholder="enter admin key" autocomplete="off"
+        style="-webkit-text-security: disc;">
       <button class="admin-login-submit" id="admin-login-submit" onclick="submitAdminLogin()">authenticate</button>
       <div class="admin-login-status" id="admin-login-status"></div>
     </div>
@@ -1694,7 +1696,7 @@
           try {
             const data = await res.json();
             if (data.error) errMsg = data.error;
-          } catch (_) {}
+          } catch (_) { }
           statusEl.textContent = errMsg;
           statusEl.className = 'gb-status error';
           sendBtn.disabled = false;
@@ -1866,8 +1868,8 @@
     function formatDate(dateString) {
       if (!dateString) return 'Never';
       const d = new Date(dateString);
-      return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString(undefined, { 
-        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+      return isNaN(d.getTime()) ? 'Unknown' : d.toLocaleString(undefined, {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
       });
     }
 
@@ -1894,7 +1896,7 @@
       if (v.location.timezone) locFields.push(vField('tz', v.location.timezone));
       if (v.location.isp) locFields.push(vField('isp', v.location.isp));
 
-      var msgsHtml = v.messages.map(function(m) {
+      var msgsHtml = v.messages.map(function (m) {
         var emailLine = m.email ? '<div class="visitor-msg-email">' + escapeHtml(m.email) + '</div>' : '';
         return '<div class="visitor-msg"><div class="visitor-msg-header"><span class="visitor-msg-name">' +
           escapeHtml(m.name || 'Anonymous') + '</span><span class="visitor-msg-time">' +
@@ -1929,11 +1931,11 @@
     function closeVisitorLog() {
       var modal = document.getElementById('admin-log-modal');
       modal.classList.remove('open');
-      setTimeout(function() { modal.style.display = 'none'; }, 400);
+      setTimeout(function () { modal.style.display = 'none'; }, 400);
     }
 
     // wipe the admin token when the page unloads for security
-    window.addEventListener('beforeunload', function() {
+    window.addEventListener('beforeunload', function () {
       __adminToken = null;
     });
 
