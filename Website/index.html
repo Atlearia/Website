@@ -2428,11 +2428,35 @@
       return perfResult;
     });
 
-    // ── Visitor beacon — log hardware fingerprint on every page load ──
+    // ── Visitor beacon — two-phase logging ──
+    // Phase 1: fires immediately with whatever is available right now.
+    // no waiting on perf tracker, no waiting on WebGL. if the visitor
+    // closes the tab 500ms in, we still get their entry.
+    {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      const instantPayload = {
+        beacon_phase: 'instant',
+        screenWidth: screen.width || null,
+        screenHeight: screen.height || null,
+        pixelRatio: window.devicePixelRatio || null,
+        colorDepth: screen.colorDepth || null,
+        deviceType: isMobile ? 'mobile' : 'desktop',
+        connection: conn?.effectiveType || null,
+      };
+      fetch('https://ningye-api.onrender.com/api/visitor-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(instantPayload),
+      }).catch(() => { /* network dead or Render down, nothing we can do */ });
+    }
+
+    // Phase 2: fires after perf tracker finishes with full hardware data.
+    // the server merges this into the same visitor row (grouped by ip_hash).
     perfPromise.then(perfResult => {
       if (!perfResult) return;
       const hw = perfResult.hardware || {};
       const payload = {
+        beacon_phase: 'enriched',
         gpuRenderer: hw.gpu || null,
         gpuVendor: hw.vendor || null,
         deviceMemory: hw.memory || null,
@@ -2447,7 +2471,6 @@
         batteryLevel: hw.battery?.level ?? null,
         batteryCharging: hw.battery?.charging ?? null,
       };
-      // fire-and-forget, no blocking
       fetch('https://ningye-api.onrender.com/api/visitor-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
