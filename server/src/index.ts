@@ -8,7 +8,7 @@ import adminRouter from './adminRoutes.js';
 import guestbookRouter from './guestbookRoutes.js';
 import visitorLogRouter from './visitorRoutes.js';
 import pool from './db.js';
-import { ensureIpHashKey, getClientIp, hashIp } from './ipHash.js';
+import { ensureIpHashKey } from './ipHash.js';
 import { runRetentionCleanup, scheduleRetentionCleanup } from './retention.js';
 
 dotenv.config();
@@ -123,52 +123,6 @@ app.get('/health', async (_req, res) => {
     res.status(503).json({ status: 'error' });
   }
 });
-
-// #region agent log
-// TEMP debug endpoint — returns whatever the server sees for the request's IP
-// origin. Visit https://ningye-api.onrender.com/api/debug-ip from any device.
-app.get('/api/debug-ip', (req, res) => {
-  const resolvedClientIp = getClientIp(req);
-  const data = {
-    trustProxySetting: (() => {
-      const v = req.app.get('trust proxy');
-      return typeof v === 'function' ? 'function' : String(v);
-    })(),
-    reqIp: req.ip ?? null,
-    reqIps: req.ips ?? null,
-    socketRemoteAddress: req.socket?.remoteAddress ?? null,
-    xForwardedFor: req.headers['x-forwarded-for'] ?? null,
-    xRealIp: req.headers['x-real-ip'] ?? null,
-    cfConnectingIp: req.headers['cf-connecting-ip'] ?? null,
-    forwarded: req.headers['forwarded'] ?? null,
-    resolvedClientIp,
-    resolvedIpHashPrefix: hashIp(resolvedClientIp).slice(0, 12),
-    userAgent: req.headers['user-agent'] ?? null,
-    timestamp: Date.now(),
-  };
-  console.log('[DEBUG /api/debug-ip]', JSON.stringify({
-    sessionId: '680c89',
-    location: 'server/src/index.ts:GET /api/debug-ip',
-    hypothesisId: 'H1+H2+H3',
-    message: 'debug-ip echo',
-    data,
-    timestamp: Date.now(),
-  }));
-  fetch('http://127.0.0.1:7456/ingest/fff21919-3e8a-4827-afcf-34961ad32eb0', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '680c89' },
-    body: JSON.stringify({
-      sessionId: '680c89',
-      location: 'server/src/index.ts:GET /api/debug-ip',
-      hypothesisId: 'H1+H2+H3',
-      message: 'debug-ip echo',
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  res.json(data);
-});
-// #endregion
 
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
