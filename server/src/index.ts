@@ -8,7 +8,7 @@ import adminRouter from './adminRoutes.js';
 import guestbookRouter from './guestbookRoutes.js';
 import visitorLogRouter from './visitorRoutes.js';
 import pool from './db.js';
-import { ensureIpHashKey } from './ipHash.js';
+import { ensureIpHashKey, getClientIp, hashIp } from './ipHash.js';
 import { runRetentionCleanup, scheduleRetentionCleanup } from './retention.js';
 
 dotenv.config();
@@ -128,6 +128,7 @@ app.get('/health', async (_req, res) => {
 // TEMP debug endpoint — returns whatever the server sees for the request's IP
 // origin. Visit https://ningye-api.onrender.com/api/debug-ip from any device.
 app.get('/api/debug-ip', (req, res) => {
+  const resolvedClientIp = getClientIp(req);
   const data = {
     trustProxySetting: (() => {
       const v = req.app.get('trust proxy');
@@ -140,6 +141,8 @@ app.get('/api/debug-ip', (req, res) => {
     xRealIp: req.headers['x-real-ip'] ?? null,
     cfConnectingIp: req.headers['cf-connecting-ip'] ?? null,
     forwarded: req.headers['forwarded'] ?? null,
+    resolvedClientIp,
+    resolvedIpHashPrefix: hashIp(resolvedClientIp).slice(0, 12),
     userAgent: req.headers['user-agent'] ?? null,
     timestamp: Date.now(),
   };

@@ -56,8 +56,20 @@ export function hashIp(rawIp: string | undefined | null): string {
   return createHmac('sha256', key).update(normalized).digest('hex');
 }
 
-// pull the client IP from the request (respects trust proxy), then hash it
+// pull the client IP from the request, then hash it.
+//
+// Render fronts *.onrender.com with Cloudflare, so every real visitor request
+// arrives with a 3-hop chain (client, Cloudflare edge, Render LB). With
+// `trust proxy = 1` Express returns Render's internal LB IP, which only has
+// ~3 rotating values — so every visitor would collapse into one of 3 buckets.
+//
+// Cloudflare always sets `CF-Connecting-IP` to the real client IP and
+// overwrites any value supplied by the client, so it is both reliable and
+// non-spoofable in this deployment topology. Fall back to req.ip / socket
+// for local dev or any environment where CF is not in front.
 export function getClientIp(req: Request): string {
+  const cfIp = req.headers['cf-connecting-ip'];
+  if (typeof cfIp === 'string' && cfIp.length > 0) return cfIp;
   return req.ip || req.socket.remoteAddress || 'unknown';
 }
 
