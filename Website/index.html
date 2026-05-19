@@ -1310,6 +1310,49 @@
     }
 
     /* messages within visitor card */
+    .visitor-msgs-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px 4px 6px;
+      margin-top: 2px;
+      background: rgba(232, 196, 124, 0.06);
+      border: 1px solid rgba(232, 196, 124, 0.18);
+      border-radius: 4px;
+      color: #e8c47c;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .visitor-msgs-toggle:hover {
+      background: rgba(232, 196, 124, 0.12);
+      border-color: rgba(232, 196, 124, 0.35);
+    }
+
+    .visitor-msgs-toggle .chev {
+      display: inline-block;
+      transition: transform 0.18s ease;
+      font-size: 9px;
+      color: rgba(232, 196, 124, 0.8);
+    }
+
+    .visitor-msgs-wrap.open > .visitor-msgs-toggle .chev {
+      transform: rotate(90deg);
+    }
+
+    .visitor-msgs-list {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.25s ease;
+    }
+
+    .visitor-msgs-wrap.open > .visitor-msgs-list {
+      max-height: 2000px;
+    }
+
     .visitor-msg {
       padding: 10px 14px;
       margin-top: 6px;
@@ -1896,13 +1939,27 @@
       if (v.location.timezone) locFields.push(vField('tz', v.location.timezone));
       if (v.location.isp) locFields.push(vField('isp', v.location.isp));
 
-      var msgsHtml = v.messages.map(function (m) {
+      var msgItems = v.messages.map(function (m) {
         var emailLine = m.email ? '<div class="visitor-msg-email">' + escapeHtml(m.email) + '</div>' : '';
         return '<div class="visitor-msg"><div class="visitor-msg-header"><span class="visitor-msg-name">' +
           escapeHtml(m.name || 'Anonymous') + '</span><span class="visitor-msg-time">' +
           formatDate(m.createdAt) + '</span></div>' + emailLine +
           '<div class="visitor-msg-body">' + escapeHtml(m.message) + '</div></div>';
       }).join('');
+
+      var msgsSection = '';
+      if (v.messages.length > 0) {
+        var label = v.messages.length + ' message' + (v.messages.length > 1 ? 's' : '') + ' from "Write to me"';
+        msgsSection =
+          '<div class="visitor-section"><div class="visitor-section-title">messages</div>' +
+            '<div class="visitor-msgs-wrap">' +
+              '<button type="button" class="visitor-msgs-toggle" onclick="toggleVisitorMessages(event, this)">' +
+                '<span class="chev">\u25B6</span>' + escapeHtml(label) +
+              '</button>' +
+              '<div class="visitor-msgs-list">' + msgItems + '</div>' +
+            '</div>' +
+          '</div>';
+      }
 
       var uaLine = v.userAgent
         ? '<div class="visitor-section"><div class="visitor-section-title">user agent</div><div class="visitor-ua">' + escapeHtml(v.userAgent) + '</div></div>' : '';
@@ -1916,7 +1973,7 @@
         '<div class="visitor-card-body">' +
         (hwFields.length > 0 ? '<div class="visitor-section"><div class="visitor-section-title">hardware</div><div class="visitor-grid">' + hwFields.join('') + '</div></div>' : '') +
         (locFields.length > 0 ? '<div class="visitor-section"><div class="visitor-section-title">location</div><div class="visitor-grid">' + locFields.join('') + '</div></div>' : '') +
-        (msgsHtml ? '<div class="visitor-section"><div class="visitor-section-title">messages</div>' + msgsHtml + '</div>' : '') +
+        msgsSection +
         uaLine + '</div></div>';
     }
 
@@ -1926,6 +1983,11 @@
 
     function toggleVisitorCard(headerEl) {
       headerEl.closest('.visitor-card').classList.toggle('expanded');
+    }
+
+    function toggleVisitorMessages(ev, btnEl) {
+      ev.stopPropagation();
+      btnEl.closest('.visitor-msgs-wrap').classList.toggle('open');
     }
 
     function closeVisitorLog() {
@@ -2430,10 +2492,31 @@
 
     // ── Visitor beacon — two-phase logging ──
     // Phase 1: fires immediately with whatever is available right now.
-    // no waiting on perf tracker, no waiting on WebGL. if the visitor
+    // no waiting on perf tracker, no waiting on the GLB. if the visitor
     // closes the tab 500ms in, we still get their entry.
+    //
+    // we also do a fast inline WebGL probe so GPU/vendor land in the DB
+    // even when the perf tracker pipeline fails (rare, but seen on locked-
+    // down browsers and after WebGL context loss).
     {
       const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      let quickGpu = null, quickVendor = null, quickWebGL = null;
+      try {
+        const c = document.createElement('canvas');
+        const opts = { powerPreference: 'high-performance', failIfMajorPerformanceCaveat: false };
+        const gl = c.getContext('webgl2', opts) || c.getContext('webgl', opts);
+        if (gl) {
+          quickWebGL = c.getContext('webgl2', opts) ? 2 : 1;
+          const ext = gl.getExtension('WEBGL_debug_renderer_info');
+          if (ext) {
+            quickGpu = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || null;
+            quickVendor = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) || null;
+          }
+          const lose = gl.getExtension('WEBGL_lose_context');
+          if (lose) lose.loseContext();
+        }
+      } catch { /* WebGL blocked, leave nulls and let Phase 2 try again */ }
+
       const instantPayload = {
         beacon_phase: 'instant',
         screenWidth: screen.width || null,
@@ -2442,6 +2525,11 @@
         colorDepth: screen.colorDepth || null,
         deviceType: isMobile ? 'mobile' : 'desktop',
         connection: conn?.effectiveType || null,
+        gpuRenderer: quickGpu,
+        gpuVendor: quickVendor,
+        webglVersion: quickWebGL,
+        deviceMemory: navigator.deviceMemory || null,
+        coreCount: navigator.hardwareConcurrency || null,
       };
       fetch('https://ningye-api.onrender.com/api/visitor-log', {
         method: 'POST',
