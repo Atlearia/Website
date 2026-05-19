@@ -1,8 +1,7 @@
-name: Deploy to GitHub Pages
+name: CI & Deploy
 
 on:
   push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -10,18 +9,135 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  # ─────────────────────────────────────────────────────────────
+  # Frontend: type-check, unit tests, production build.
+  # Runs on every push to any branch.
+  # ─────────────────────────────────────────────────────────────
+  frontend-check:
+    name: Frontend (MathExercice) checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: MathExercice/package-lock.json
+
+      - name: Install
+        working-directory: MathExercice
+        run: npm ci
+
+      - name: Type-check
+        working-directory: MathExercice
+        run: npm run typecheck
+
+      - name: Unit tests
+        working-directory: MathExercice
+        run: npm test
+
+      - name: Build
+        working-directory: MathExercice
+        run: npm run build
+
+  # ─────────────────────────────────────────────────────────────
+  # Server: type-check, build, unit tests.
+  # Runs on every push to any branch. Catches regressions in the
+  # API before Render deploys them.
+  # ─────────────────────────────────────────────────────────────
+  server-check:
+    name: Server (Express API) checks
+    runs-on: ubuntu-latest
+    env:
+      # Junk value just so ipHash module-load doesn't complain in tests.
+      # The real key is set in Render/production env, never here.
+      IP_HASH_KEY: ci-test-key-not-used-anywhere
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install
+        working-directory: server
+        run: npm ci
+
+      - name: Type-check & build
+        working-directory: server
+        run: npm run build
+
+      - name: Unit tests
+        working-directory: server
+        run: npm test
+
+  # ─────────────────────────────────────────────────────────────
+  # Migration smoke test against an ephemeral Postgres.
+  # Mirrors what Render runs on every deploy (`npm run migrate`)
+  # so a broken schema.sql is caught here, not in production.
+  # ─────────────────────────────────────────────────────────────
+  migration-smoke:
+    name: Migration smoke test (ephemeral Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      IP_HASH_KEY: ci-test-key-not-used-anywhere
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install
+        working-directory: server
+        run: npm ci
+
+      - name: Apply schema.sql against fresh Postgres
+        working-directory: server
+        run: npm run migrate
+
+      - name: Re-apply schema.sql (idempotency check)
+        working-directory: server
+        run: npm run migrate
+
+  # ─────────────────────────────────────────────────────────────
+  # Build the deployable site artifact. Only on main, only after
+  # every check above passes.
+  # ─────────────────────────────────────────────────────────────
+  build-site:
+    name: Build site for Pages
+    needs: [frontend-check, server-check, migration-smoke]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
 
-      # ── Build MathExercice (Vite/React) ──
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -34,19 +150,12 @@ jobs:
           npm ci
           npm run build
 
-      # ── Assemble deploy directory ──
       - name: Assemble site
         run: |
           mkdir -p _site
-
-          # Copy Website/ (static portfolio) as the root
           cp -r Website/* _site/
           cp Website/.gitattributes _site/ 2>/dev/null || true
-
-          # Copy MathExercice build output into /math
           cp -r MathExercice/dist _site/math
-
-          # Ensure CNAME is at the root for custom domain
           echo "ningye.ca" > _site/CNAME
 
       - uses: actions/upload-pages-artifact@v3
@@ -54,8 +163,14 @@ jobs:
           path: _site
           name: github-pages
 
+  # ─────────────────────────────────────────────────────────────
+  # Deploy to GitHub Pages. Only runs if every check passed and
+  # build-site succeeded. main only.
+  # ─────────────────────────────────────────────────────────────
   deploy:
-    needs: build
+    name: Deploy to GitHub Pages
+    needs: build-site
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

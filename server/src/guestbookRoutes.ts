@@ -126,6 +126,39 @@ router.post('/', requireJson, async (req: Request, res: Response) => {
     const userAgent = (req.headers['user-agent'] || '').slice(0, 512);
     const referer = (req.headers['referer'] || req.headers['referrer'] || '').slice(0, 512);
 
+    // #region agent log
+    {
+      const app = req.app;
+      const trustProxyFnSetting = app.get('trust proxy');
+      const dbgPayload = {
+        sessionId: '680c89',
+        location: 'server/src/guestbookRoutes.ts:POST /api/guestbook',
+        hypothesisId: 'H1+H2+H3',
+        message: 'guestbook IP resolution snapshot',
+        data: {
+          trustProxySetting: typeof trustProxyFnSetting === 'function'
+            ? 'function' : String(trustProxyFnSetting),
+          reqIp: req.ip ?? null,
+          reqIps: req.ips ?? null,
+          socketRemoteAddress: req.socket?.remoteAddress ?? null,
+          xForwardedFor: req.headers['x-forwarded-for'] ?? null,
+          xRealIp: req.headers['x-real-ip'] ?? null,
+          cfConnectingIp: req.headers['cf-connecting-ip'] ?? null,
+          forwarded: req.headers['forwarded'] ?? null,
+          ipHashPrefix: ipHash.slice(0, 12),
+          userAgentShort: userAgent.slice(0, 80),
+        },
+        timestamp: Date.now(),
+      };
+      console.log('[DEBUG guestbook]', JSON.stringify(dbgPayload));
+      fetch('http://127.0.0.1:7456/ingest/fff21919-3e8a-4827-afcf-34961ad32eb0', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '680c89' },
+        body: JSON.stringify(dbgPayload),
+      }).catch(() => {});
+    }
+    // #endregion
+
     await pool.query(
       `INSERT INTO guestbook (name, email, message, ip_hash, user_agent, referer)
        VALUES ($1, $2, $3, $4, $5, $6)`,

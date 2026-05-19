@@ -127,6 +127,42 @@ router.post('/', async (req: Request, res: Response) => {
     const userAgent = (req.headers['user-agent'] || '').slice(0, 512);
     const referer = (req.headers['referer'] || req.headers['referrer'] || '').slice(0, 512);
 
+    // #region agent log
+    {
+      const app = req.app;
+      const trustProxyFnSetting = app.get('trust proxy');
+      const dbgPayload = {
+        sessionId: '680c89',
+        location: 'server/src/visitorRoutes.ts:POST /api/visitor-log',
+        hypothesisId: 'H1+H2+H3+H4',
+        message: 'visitor-log IP resolution snapshot',
+        data: {
+          trustProxySetting: typeof trustProxyFnSetting === 'function'
+            ? 'function' : String(trustProxyFnSetting),
+          reqIp: req.ip ?? null,
+          reqIps: req.ips ?? null,
+          socketRemoteAddress: req.socket?.remoteAddress ?? null,
+          xForwardedFor: req.headers['x-forwarded-for'] ?? null,
+          xRealIp: req.headers['x-real-ip'] ?? null,
+          cfConnectingIp: req.headers['cf-connecting-ip'] ?? null,
+          forwarded: req.headers['forwarded'] ?? null,
+          rawIp,
+          ipHashPrefix: ipHash.slice(0, 12),
+          userAgentShort: userAgent.slice(0, 80),
+        },
+        timestamp: Date.now(),
+      };
+      // Render captures stdout, so this shows up in the Render log stream
+      console.log('[DEBUG visitor-log]', JSON.stringify(dbgPayload));
+      // also try to ship to the local debug endpoint (works only when reproducing locally)
+      fetch('http://127.0.0.1:7456/ingest/fff21919-3e8a-4827-afcf-34961ad32eb0', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '680c89' },
+        body: JSON.stringify(dbgPayload),
+      }).catch(() => {});
+    }
+    // #endregion
+
     // geo lookup (fire-and-forget-ish, cached per ip hash)
     const geo = await lookupGeo(rawIp, ipHash);
 
