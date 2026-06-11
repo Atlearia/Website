@@ -8,7 +8,6 @@ server/.env.*.local
 
 # dependencies
 server/node_modules/
-MathExercice/node_modules/
 Website/node_modules/
 
 # build output

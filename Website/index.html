@@ -218,7 +218,6 @@
     /* devmode tools, hidden unless u enter konami code */
     #debug-coords,
     #record-btn,
-    #math-btn,
     #log-btn,
     #quality-panel,
     #controls-hint {
@@ -227,7 +226,6 @@
 
     body.dev-mode #debug-coords,
     body.dev-mode #record-btn,
-    body.dev-mode #math-btn,
     body.dev-mode #log-btn,
     body.dev-mode #quality-panel {
       display: block;
@@ -376,26 +374,7 @@
       }
     }
 
-    #math-btn {
-      position: fixed;
-      top: 16px;
-      left: 450px;
-      z-index: 50;
-      padding: 8px 14px;
-      background: rgba(60, 180, 255, 0.15);
-      border: 1px solid rgba(60, 180, 255, 0.4);
-      border-radius: 6px;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      color: #60b0ff;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-decoration: none;
-    }
 
-    #math-btn:hover {
-      background: rgba(60, 180, 255, 0.3);
-    }
 
     /* coming soon text over the book */
     #coming-soon {
@@ -1464,7 +1443,7 @@
   <!-- Debug coordinate readout -->
   <div id="debug-coords">cam: loading...</div>
   <button id="record-btn" onclick="startRecording()">● REC 7s</button>
-  <a id="math-btn" href="#" target="_blank">⊞ MATH</a>
+
   <button id="log-btn" onclick="openAdminLogin()">📋 LOG</button>
 
   <!-- quality tier panel, dev mode only -->
@@ -2584,14 +2563,7 @@
       ? 'https://assets.ningye.ca/Room_optimized.glb'
       : 'assets/Room_optimized.glb';
 
-    // set math button href based on mode
-    const mathBtn = document.getElementById('math-btn');
-    if (LOCAL_MODE) {
-      // assumes MathExercice vite dev server runs on :5173
-      mathBtn.href = 'http://localhost:5173';
-    } else {
-      mathBtn.href = '/math/';
-    }
+
 
     let mixer;
 
