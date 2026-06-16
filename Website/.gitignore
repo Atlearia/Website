@@ -26,6 +26,3 @@ meshy2.glb
 node_modules/
 package.json
 package-lock.json
-
-# Loading-screen tree video — kept local, not shipped in the repo
-assets/tree2.mp4
