@@ -2048,16 +2048,23 @@
     (function initTreeLoader() {
       const loaderEl = document.getElementById('loader');
       const video = document.getElementById('loader-tree-video');
+      const percentEl = document.getElementById('loader-percent');
+      const progressFill = document.getElementById('progress-fill');
       if (!video) return;
 
-      let duration = 0;     // video length, read from metadata
-      let ready = false;    // metadata loaded + safe to seek
-      let displayTime = 0;  // currently displayed time (eased)
-      let targetTime = 0;   // progress-derived target time
+      let duration = 0;      // video length, read from metadata
+      let ready = false;     // metadata loaded + safe to seek
+      let displayTime = 0;   // currently displayed time (eased)
+      let targetTime = 0;    // progress-derived target time
+      let finishing = false; // download done — drive the tree to full growth
+      let done = false;      // end reached + handed back to the caller
+      let onComplete = null; // fired once the tree has actually finished growing
 
       video.addEventListener('loadedmetadata', () => {
         duration = (isFinite(video.duration) && video.duration > 0) ? video.duration : 8;
         ready = true;
+        // if the download beat the metadata, aim straight for the end
+        if (finishing) targetTime = duration;
       });
 
       // iOS/Safari won't let us seek a video until the decoder is "unlocked"
@@ -2072,12 +2079,35 @@
         }
       }, { once: true });
 
-      // called by the GLTF progress callback (0–100)
+      // called by the GLTF progress callback (0–100). this only nudges the
+      // target forward — the eased displayTime is what actually drives both
+      // the video AND the on-screen number, so they can never disagree.
       window.updateLoaderFrame = function (pct) {
-        if (!duration) return;
+        if (!duration || finishing) return;
         const t = Math.min(Math.max(pct, 0) / 100, 1) * duration;
         if (t > targetTime) targetTime = t;
       };
+
+      // called once the model has fully loaded. drives the tree to full growth
+      // and only calls `cb` when the video has genuinely reached the end, so we
+      // never flash 100% / fade out while the tree is still mid-growth.
+      window.completeLoaderVideo = function (cb) {
+        onComplete = cb;
+        finishing = true;
+        if (ready && duration) targetTime = duration;
+        // safety net: never trap the user on the loader if the video can't seek
+        setTimeout(settle, 4000);
+      };
+
+      function settle() {
+        if (done) return;
+        done = true;
+        if (percentEl) percentEl.textContent = '100%';
+        if (progressFill) progressFill.style.width = '100%';
+        const cb = onComplete;
+        onComplete = null;
+        if (cb) cb();
+      }
 
       function animate() {
         if (loaderEl.classList.contains('hidden')) return;
@@ -2087,14 +2117,24 @@
         if (ready && duration && !video.seeking) {
           const diff = targetTime - displayTime;
           if (diff > 0.001) {
-            // ease toward the target (12% of the remaining gap per frame),
-            // with a small floor so it always keeps creeping forward.
-            displayTime += Math.max(diff * 0.12, 1 / 120);
+            // ease toward the target; speed up once the download is done so the
+            // final growth doesn't drag, with a small floor so it keeps creeping.
+            const rate = finishing ? 0.2 : 0.12;
+            displayTime += Math.max(diff * rate, 1 / 120);
             if (displayTime > targetTime) displayTime = targetTime;
             // keep a hair off the very end to avoid 'ended'/black-frame quirks
             try { video.currentTime = Math.min(displayTime, duration - 0.001); }
             catch (e) {}
           }
+
+          // lock the on-screen number + bar to the tree's *actual* growth, so
+          // "100%" only ever appears when the tree is fully grown.
+          const pct = Math.min((displayTime / duration) * 100, 100);
+          if (percentEl) percentEl.textContent = Math.round(pct) + '%';
+          if (progressFill) progressFill.style.width = pct + '%';
+
+          // fully grown + download done → hand control back to the caller
+          if (finishing && targetTime - displayTime <= 0.001) settle();
         }
 
         requestAnimationFrame(animate);
@@ -2660,21 +2700,28 @@
           }
         }
 
-        // fade out loader — let tree reach final frame first
-        progressFill.style.width = '100%';
-        percentEl.textContent = '100%';
-        if (window.updateLoaderFrame) window.updateLoaderFrame(100);
-
-        setTimeout(() => {
+        // drive the tree to full growth, THEN fade out. completeLoaderVideo
+        // only calls back once the video has actually reached the end, so the
+        // 100% / fade can't happen while the tree is still growing.
+        const finishLoader = () => {
           loaderEl.classList.add('hidden');
           beginIntroAnimation();
-        }, 1200);
+        };
+        if (window.completeLoaderVideo) {
+          // small hold so the fully-grown tree is visible before the fade
+          window.completeLoaderVideo(() => setTimeout(finishLoader, 400));
+        } else {
+          progressFill.style.width = '100%';
+          percentEl.textContent = '100%';
+          setTimeout(finishLoader, 1200);
+        }
       },
       (progress) => {
         if (progress.total > 0) {
+          // cap at 99 during download so the number/tree only hit 100% once
+          // the model has fully loaded; the loader's animate loop owns the
+          // actual percent text + bar (driven by the eased video time).
           const pct = Math.min((progress.loaded / progress.total) * 100, 99);
-          progressFill.style.width = pct + '%';
-          percentEl.textContent = Math.round(pct) + '%';
           if (window.updateLoaderFrame) window.updateLoaderFrame(pct);
         }
       },
