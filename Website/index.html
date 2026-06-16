@@ -87,7 +87,7 @@
     }
 
     /* the tree growth video — centered, no glow/shadow.
-       scrubbed in sync with model download progress (see initTreeLoader). */
+       played in sync with model download progress (see initTreeLoader). */
     #loader-tree-video {
       width: clamp(630px, 100vw, 1170px);
       height: auto;
@@ -2040,10 +2040,13 @@
     }
   </script>
 
-  <!-- tree growth video — scrubbed in sync with GLTF loading progress.
+  <!-- tree growth video — played in sync with GLTF loading progress.
        replaces the old 240-frame image sequence (~69 MB in memory) with a
-       single ~1.3 MB mp4 the browser decodes on demand. the video time is
-       mapped to download progress so the tree "grows" as the model loads. -->
+       single ~1.3 MB mp4. NOTE: we deliberately PLAY the video forward and
+       modulate playbackRate toward a download-derived target instead of
+       SEEKING it (currentTime = ...). seeking an inter-frame h.264 clip snaps
+       to sparse keyframes and looks blocky; forward decode renders every frame
+       so the tree grows smoothly. -->
   <script>
     (function initTreeLoader() {
       const loaderEl = document.getElementById('loader');
@@ -2053,12 +2056,14 @@
       if (!video) return;
 
       let duration = 0;      // video length, read from metadata
-      let ready = false;     // metadata loaded + safe to seek
-      let displayTime = 0;   // currently displayed time (eased)
-      let targetTime = 0;    // progress-derived target time
-      let finishing = false; // download done — drive the tree to full growth
+      let ready = false;     // metadata loaded + safe to drive
+      let targetTime = 0;    // how far the download says the tree should be grown
+      let finishing = false; // download done — let the tree play out to the end
       let done = false;      // end reached + handed back to the caller
       let onComplete = null; // fired once the tree has actually finished growing
+
+      try { video.pause(); } catch (e) {}
+      video.playbackRate = 1;
 
       video.addEventListener('loadedmetadata', () => {
         duration = (isFinite(video.duration) && video.duration > 0) ? video.duration : 8;
@@ -2067,41 +2072,37 @@
         if (finishing) targetTime = duration;
       });
 
-      // iOS/Safari won't let us seek a video until the decoder is "unlocked"
-      // by a muted play(). it's muted + playsinline so this is allowed without
-      // a user gesture; we pause immediately and drive playback via currentTime.
+      // muted + playsinline lets us autoplay without a user gesture; we just
+      // need one play() to "unlock" the decoder, then animate() gates playback.
       video.addEventListener('canplay', () => {
         const p = video.play();
-        if (p && typeof p.then === 'function') {
-          p.then(() => video.pause()).catch(() => {});
-        } else {
-          try { video.pause(); } catch (e) {}
-        }
+        if (p && typeof p.then === 'function') p.catch(() => {});
       }, { once: true });
 
-      // called by the GLTF progress callback (0–100). this only nudges the
-      // target forward — the eased displayTime is what actually drives both
-      // the video AND the on-screen number, so they can never disagree.
+      // called by the GLTF progress callback (0–100). only nudges the target
+      // forward; the video's own currentTime is what drives the on-screen
+      // number, so the tree and the percentage can never disagree.
       window.updateLoaderFrame = function (pct) {
         if (!duration || finishing) return;
         const t = Math.min(Math.max(pct, 0) / 100, 1) * duration;
         if (t > targetTime) targetTime = t;
       };
 
-      // called once the model has fully loaded. drives the tree to full growth
-      // and only calls `cb` when the video has genuinely reached the end, so we
+      // called once the model has fully loaded. lets the tree play out to the
+      // end, and only calls `cb` once the video has genuinely finished, so we
       // never flash 100% / fade out while the tree is still mid-growth.
       window.completeLoaderVideo = function (cb) {
         onComplete = cb;
         finishing = true;
         if (ready && duration) targetTime = duration;
-        // safety net: never trap the user on the loader if the video can't seek
+        // safety net: never trap the user on the loader if the video can't play
         setTimeout(settle, 4000);
       };
 
       function settle() {
         if (done) return;
         done = true;
+        try { video.pause(); } catch (e) {}
         if (percentEl) percentEl.textContent = '100%';
         if (progressFill) progressFill.style.width = '100%';
         const cb = onComplete;
@@ -2112,29 +2113,31 @@
       function animate() {
         if (loaderEl.classList.contains('hidden')) return;
 
-        // only issue a new seek once the previous one finished — this keeps the
-        // decoder from being flooded and avoids scrubbing stutter.
-        if (ready && duration && !video.seeking) {
-          const diff = targetTime - displayTime;
-          if (diff > 0.001) {
-            // ease toward the target; speed up once the download is done so the
-            // final growth doesn't drag, with a small floor so it keeps creeping.
-            const rate = finishing ? 0.2 : 0.12;
-            displayTime += Math.max(diff * rate, 1 / 120);
-            if (displayTime > targetTime) displayTime = targetTime;
-            // keep a hair off the very end to avoid 'ended'/black-frame quirks
-            try { video.currentTime = Math.min(displayTime, duration - 0.001); }
-            catch (e) {}
+        if (ready && duration) {
+          const ct = video.currentTime;
+          const gap = targetTime - ct;
+
+          if (gap > 0.05) {
+            // behind the target → play forward, faster the further behind we
+            // are. modulating playbackRate (vs. seeking) keeps it buttery.
+            const rate = finishing
+              ? Math.min(Math.max(gap * 1.5, 2), 6)   // download done: play out briskly
+              : Math.min(Math.max(gap * 2, 0.6), 5);  // tracking download: ease along
+            video.playbackRate = rate;
+            if (video.paused) video.play().catch(() => {});
+          } else if (gap <= 0) {
+            // caught up to the download → hold this frame until more arrives
+            if (!video.paused) { try { video.pause(); } catch (e) {} }
           }
 
-          // lock the on-screen number + bar to the tree's *actual* growth, so
-          // "100%" only ever appears when the tree is fully grown.
-          const pct = Math.min((displayTime / duration) * 100, 100);
+          // number + bar follow the frame the user actually sees, so "100%"
+          // only ever appears when the tree is fully grown.
+          const pct = Math.min((ct / duration) * 100, 100);
           if (percentEl) percentEl.textContent = Math.round(pct) + '%';
           if (progressFill) progressFill.style.width = pct + '%';
 
           // fully grown + download done → hand control back to the caller
-          if (finishing && targetTime - displayTime <= 0.001) settle();
+          if (finishing && (video.ended || duration - ct <= 0.05)) settle();
         }
 
         requestAnimationFrame(animate);
