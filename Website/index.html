@@ -2055,12 +2055,13 @@
       const progressFill = document.getElementById('progress-fill');
       if (!video) return;
 
-      let duration = 0;      // video length, read from metadata
-      let ready = false;     // metadata loaded + safe to drive
-      let targetTime = 0;    // how far the download says the tree should be grown
-      let finishing = false; // download done — let the tree play out to the end
-      let done = false;      // end reached + handed back to the caller
-      let onComplete = null; // fired once the tree has actually finished growing
+      let duration = 0;       // video length, read from metadata
+      let ready = false;      // metadata loaded + safe to drive
+      let targetTime = 0;     // how far the download says the tree should be grown
+      let finishing = false;  // download done — let the tree play out to the end
+      let done = false;       // end reached + handed back to the caller
+      let onComplete = null;  // fired once the tree has actually finished growing
+      let videoBroken = false;// genuine media error (404 / decode fail), not a stall
 
       try { video.pause(); } catch (e) {}
       video.playbackRate = 1;
@@ -2079,6 +2080,13 @@
         if (p && typeof p.then === 'function') p.catch(() => {});
       }, { once: true });
 
+      // a genuine media error (bad URL / decode failure) is NOT the same as the
+      // video "blocking" on buffering. we still gate the loader on playback, but
+      // a truly dead asset shouldn't permanently trap the (loaded) site behind
+      // the loader, so flag it and let animate() release once the model is done.
+      video.addEventListener('error', () => { videoBroken = true; });
+      if (video.error) videoBroken = true;
+
       // called by the GLTF progress callback (0–100). only nudges the target
       // forward; the video's own currentTime is what drives the on-screen
       // number, so the tree and the percentage can never disagree.
@@ -2095,8 +2103,9 @@
         onComplete = cb;
         finishing = true;
         if (ready && duration) targetTime = duration;
-        // safety net: never trap the user on the loader if the video can't play
-        setTimeout(settle, 4000);
+        // NO time-based fallback on purpose — the loader MUST wait for the
+        // video to actually play through. if the video stalls/buffers, the bar
+        // stalls with it. (only a real 'error' above can release it early.)
       };
 
       function settle() {
@@ -2112,35 +2121,40 @@
 
       function animate() {
         if (loaderEl.classList.contains('hidden')) return;
+        requestAnimationFrame(animate);
+        if (done) return;
 
-        if (ready && duration) {
-          const ct = video.currentTime;
-          const gap = targetTime - ct;
+        // a truly broken asset can't "block" meaningfully — once the model is
+        // loaded, release the loader so the site isn't trapped behind a dead video.
+        if (finishing && videoBroken) { settle(); return; }
 
-          if (gap > 0.05) {
-            // behind the target → play forward, faster the further behind we
-            // are. modulating playbackRate (vs. seeking) keeps it buttery.
-            const rate = finishing
-              ? Math.min(Math.max(gap * 1.5, 2), 6)   // download done: play out briskly
-              : Math.min(Math.max(gap * 2, 0.6), 5);  // tracking download: ease along
-            video.playbackRate = rate;
-            if (video.paused) video.play().catch(() => {});
-          } else if (gap <= 0) {
-            // caught up to the download → hold this frame until more arrives
-            if (!video.paused) { try { video.pause(); } catch (e) {} }
-          }
+        if (!(ready && duration)) return;
 
-          // number + bar follow the frame the user actually sees, so "100%"
-          // only ever appears when the tree is fully grown.
-          const pct = Math.min((ct / duration) * 100, 100);
-          if (percentEl) percentEl.textContent = Math.round(pct) + '%';
-          if (progressFill) progressFill.style.width = pct + '%';
+        const ct = video.currentTime;
+        const gap = targetTime - ct;
 
-          // fully grown + download done → hand control back to the caller
-          if (finishing && (video.ended || duration - ct <= 0.05)) settle();
+        if (gap > 0.05) {
+          // behind the target → play forward, faster the further behind we
+          // are. modulating playbackRate (vs. seeking) keeps it buttery.
+          const rate = finishing
+            ? Math.min(Math.max(gap * 1.5, 2), 6)   // download done: play out briskly
+            : Math.min(Math.max(gap * 2, 0.6), 5);  // tracking download: ease along
+          video.playbackRate = rate;
+          if (video.paused) video.play().catch(() => {});
+        } else if (gap <= 0) {
+          // caught up to the download → hold this frame until more arrives
+          if (!video.paused) { try { video.pause(); } catch (e) {} }
         }
 
-        requestAnimationFrame(animate);
+        // the bar/number are driven SOLELY by the frame actually on screen, so
+        // they advance exactly as fast as the video plays. if the video blocks
+        // (buffering/stalled), currentTime stops → the bar stops with it.
+        const pct = Math.min((ct / duration) * 100, 100);
+        if (percentEl) percentEl.textContent = Math.round(pct) + '%';
+        if (progressFill) progressFill.style.width = pct + '%';
+
+        // only release once the video has GENUINELY played to the end.
+        if (finishing && (video.ended || duration - ct <= 0.05)) settle();
       }
       animate();
     })();
