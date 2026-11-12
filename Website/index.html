@@ -123,6 +123,13 @@
       animation: percent-fade-in 0.8s ease forwards 0.5s;
     }
 
+    #loader.failed .loader-percent {
+      margin-top: calc(-6% + 48px);
+      white-space: nowrap;
+      opacity: 1;
+      animation: none;
+    }
+
     @keyframes percent-fade-in {
       from {
         opacity: 0;
@@ -2030,8 +2037,12 @@
           cleanup();
           track.classList.remove('indeterminate');
           track.removeAttribute('aria-valuenow');
+          track.hidden = true;
+          loader.classList.add('failed');
+          percent.setAttribute('role', 'alert');
           percent.textContent = 'Load failed';
-          status.textContent = 'The scene could not load. Please try again.';
+          status.textContent = '';
+          status.hidden = true;
           retry.hidden = false;
         }
       };
