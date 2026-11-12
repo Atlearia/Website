@@ -87,7 +87,7 @@
     }
 
     /* the tree growth video — centered, no glow/shadow.
-       played in sync with model download progress (see initTreeLoader). */
+       follows model download progress without blocking the scene. */
     #loader-tree-video {
       width: clamp(630px, 100vw, 1170px);
       height: auto;
@@ -157,6 +157,38 @@
       background: linear-gradient(90deg, rgba(232, 196, 124, 0.4), rgba(255, 180, 80, 0.8));
       border-radius: 1px;
       transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #loader-status {
+      margin-top: 16px;
+      max-width: min(85vw, 360px);
+      text-align: center;
+      color: rgba(232, 196, 124, 0.75);
+      font: 14px/1.5 'Inter', sans-serif;
+    }
+
+    #loader-retry {
+      margin-top: 16px;
+      padding: 10px 20px;
+      border: 1px solid rgba(232, 196, 124, 0.5);
+      border-radius: 6px;
+      color: #e8c47c;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .loader-progress-bar.indeterminate .loader-progress-fill {
+      width: 35% !important;
+      animation: loader-pulse 1.4s ease-in-out infinite alternate;
+    }
+
+    @keyframes loader-pulse {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(285%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .loader-progress-bar.indeterminate .loader-progress-fill { animation: none; }
     }
 
     @keyframes fade-up {
@@ -545,19 +577,6 @@
         padding: 12px clamp(28px, 6vw, 48px);
       }
 
-      .cv-embed {
-        width: 95vw;
-        height: 70vh;
-      }
-
-      .cv-modal-close {
-        top: -10px;
-        right: -5px;
-        width: 40px;
-        height: 40px;
-        font-size: 22px;
-      }
-
       .loader-title {
         font-size: 22px;
         letter-spacing: 4px;
@@ -566,97 +585,6 @@
       .progress-track {
         width: 180px;
       }
-    }
-
-    /* CV modal overlay */
-    #cv-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 2000;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: rgba(6, 6, 11, 0.88);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      opacity: 0;
-      transition: opacity 0.4s ease;
-    }
-
-    #cv-modal.open {
-      display: flex;
-      opacity: 1;
-    }
-
-    .cv-modal-inner {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-      max-width: 90vw;
-      max-height: 90vh;
-    }
-
-    .cv-modal-close {
-      position: absolute;
-      top: -14px;
-      right: -14px;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      border: 1px solid rgba(160, 140, 255, 0.3);
-      background: rgba(20, 18, 35, 0.9);
-      color: var(--text-primary);
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.25s ease;
-      z-index: 10;
-      line-height: 1;
-    }
-
-    .cv-modal-close:hover {
-      background: rgba(160, 140, 255, 0.2);
-      border-color: rgba(160, 140, 255, 0.5);
-      transform: scale(1.1);
-    }
-
-    .cv-embed {
-      width: 680px;
-      max-width: 88vw;
-      height: 78vh;
-      border: 1px solid rgba(160, 140, 255, 0.15);
-      border-radius: 8px;
-      background: #fff;
-    }
-
-    .cv-download-btn {
-      padding: 10px 28px;
-      font-family: 'Inter', sans-serif;
-      font-size: 12px;
-      font-weight: 400;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      text-decoration: none;
-      border: 1px solid rgba(232, 196, 124, 0.3);
-      border-radius: 6px;
-      background: rgba(232, 196, 124, 0.08);
-      color: var(--accent-warm);
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .cv-download-btn:hover {
-      background: rgba(232, 196, 124, 0.18);
-      border-color: rgba(232, 196, 124, 0.5);
-      box-shadow: 0 0 18px rgba(232, 196, 124, 0.12);
-      transform: translateY(-2px);
     }
 
     /* ── Guestbook modal ── */
@@ -1436,10 +1364,12 @@
     <div class="loader-content">
       <video id="loader-tree-video" src="assets/tree2.mp4" muted playsinline preload="auto"
         disablepictureinpicture aria-hidden="true"></video>
-      <div class="loader-percent" id="loader-percent">0%</div>
-      <div class="loader-progress-bar">
+      <div class="loader-percent" id="loader-percent">…</div>
+      <div class="loader-progress-bar" id="loader-progress" role="progressbar" aria-label="Scene loading progress" aria-valuemin="0" aria-valuemax="100">
         <div class="loader-progress-fill" id="progress-fill"></div>
       </div>
+      <div id="loader-status" role="status">Starting…</div>
+      <button id="loader-retry" type="button" hidden>Try again</button>
     </div>
   </div>
 
@@ -1480,28 +1410,11 @@
     <div class="coming-soon-subtitle">Meanwhile...</div>
     <div class="coming-soon-buttons">
       <div class="cs-row-secondary">
-        <button class="cs-btn" id="cv-btn" onclick="openCvModal()" style="margin-left: 20px;">CV</button>
+        <button class="cs-btn" id="cv-btn" type="button" style="margin-left: 20px;">CV</button>
         <a class="cs-btn cs-btn-github" href="https://github.com/Atlearia" target="_blank" rel="noopener noreferrer"
           style="margin-left: 70px;">Github</a>
       </div>
       <button class="cs-btn cs-btn-primary" id="guestbook-btn" onclick="openGuestbook()">Write to me</button>
-    </div>
-  </div>
-
-  <!-- CV modal -->
-  <div id="cv-modal">
-    <div class="cv-modal-inner">
-      <button class="cv-modal-close" onclick="closeCvModal()" aria-label="Close">&times;</button>
-      <iframe class="cv-embed" src="Resume.pdf" title="Resume"></iframe>
-      <a class="cv-download-btn" href="Resume.pdf" download="Resume.pdf">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="7 10 12 15 17 10" />
-          <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-        Download PDF
-      </a>
     </div>
   </div>
 
@@ -1575,45 +1488,11 @@
 
   <div id="canvas-container"></div>
 
-  <!-- CV modal handlers -->
+  <!-- Modal keyboard shortcuts -->
   <script>
-    function openCvModal() {
-      // iOS doesn't render PDF in iframes, just open it directly on mobile
-      const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
-      if (mobile) {
-        window.open('Resume.pdf', '_blank');
-        return;
-      }
-      const modal = document.getElementById('cv-modal');
-      modal.style.display = 'flex';
-      // small delay so the transition actually plays
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          modal.classList.add('open');
-        });
-      });
-    }
-
-    function closeCvModal() {
-      const modal = document.getElementById('cv-modal');
-      modal.classList.remove('open');
-      setTimeout(() => {
-        modal.style.display = 'none';
-      }, 400);
-    }
-
-    // close on backdrop click
-    document.addEventListener('DOMContentLoaded', () => {
-      const modal = document.getElementById('cv-modal');
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeCvModal();
-      });
-    });
-
     // esc to close
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        closeCvModal();
         closeGuestbook();
         if (typeof closeAdminLogin === 'function') closeAdminLogin();
         if (typeof closeVisitorLog === 'function') closeVisitorLog();
@@ -2040,123 +1919,147 @@
     }
   </script>
 
-  <!-- tree growth video — played in sync with GLTF loading progress.
-       replaces the old 240-frame image sequence (~69 MB in memory) with a
-       single ~1.3 MB mp4. NOTE: we deliberately PLAY the video forward and
-       modulate playbackRate toward a download-derived target instead of
-       SEEKING it (currentTime = ...). seeking an inter-frame h.264 clip snaps
-       to sparse keyframes and looks blocky; forward decode renders every frame
-       so the tree grows smoothly. -->
-  <script>
-    (function initTreeLoader() {
-      const loaderEl = document.getElementById('loader');
+  <!-- Estimated overall progress: download 0–90%, decode 90–95%, first render 95–100%.
+       The tree is decorative and never gates entry. -->
+  <script id="loading-controller">
+    (() => {
+      const loader = document.getElementById('loader');
       const video = document.getElementById('loader-tree-video');
-      const percentEl = document.getElementById('loader-percent');
-      const progressFill = document.getElementById('progress-fill');
-      if (!video) return;
+      const percent = document.getElementById('loader-percent');
+      const track = document.getElementById('loader-progress');
+      const fill = document.getElementById('progress-fill');
+      const status = document.getElementById('loader-status');
+      const retry = document.getElementById('loader-retry');
+      let state = 'starting';
+      let lastActivity = Date.now();
+      let lastBytes = 0;
+      let target = 0;
+      let displayedProgress = null;
+      let frame;
+      let slow = false;
+      let playPending = false;
+      let videoBroken = false;
+      const terminal = () => state === 'ready' || state === 'failed';
 
-      let duration = 0;       // video length, read from metadata
-      let ready = false;      // metadata loaded + safe to drive
-      let targetTime = 0;     // how far the download says the tree should be grown
-      let finishing = false;  // download done — let the tree play out to the end
-      let done = false;       // end reached + handed back to the caller
-      let onComplete = null;  // fired once the tree has actually finished growing
-      let videoBroken = false;// genuine media error (404 / decode fail), not a stall
-
-      try { video.pause(); } catch (e) {}
-      video.playbackRate = 1;
-
-      video.addEventListener('loadedmetadata', () => {
-        duration = (isFinite(video.duration) && video.duration > 0) ? video.duration : 8;
-        ready = true;
-        // if the download beat the metadata, aim straight for the end
-        if (finishing) targetTime = duration;
-      });
-
-      // muted + playsinline lets us autoplay without a user gesture; we just
-      // need one play() to "unlock" the decoder, then animate() gates playback.
-      video.addEventListener('canplay', () => {
-        const p = video.play();
-        if (p && typeof p.then === 'function') p.catch(() => {});
-      }, { once: true });
-
-      // a genuine media error (bad URL / decode failure) is NOT the same as the
-      // video "blocking" on buffering. we still gate the loader on playback, but
-      // a truly dead asset shouldn't permanently trap the (loaded) site behind
-      // the loader, so flag it and let animate() release once the model is done.
-      video.addEventListener('error', () => { videoBroken = true; });
-      if (video.error) videoBroken = true;
-
-      // called by the GLTF progress callback (0–100). only nudges the target
-      // forward; the video's own currentTime is what drives the on-screen
-      // number, so the tree and the percentage can never disagree.
-      window.updateLoaderFrame = function (pct) {
-        if (!duration || finishing) return;
-        const t = Math.min(Math.max(pct, 0) / 100, 1) * duration;
-        if (t > targetTime) targetTime = t;
-      };
-
-      // called once the model has fully loaded. lets the tree play out to the
-      // end, and only calls `cb` once the video has genuinely finished, so we
-      // never flash 100% / fade out while the tree is still mid-growth.
-      window.completeLoaderVideo = function (cb) {
-        onComplete = cb;
-        finishing = true;
-        if (ready && duration) targetTime = duration;
-        // NO time-based fallback on purpose — the loader MUST wait for the
-        // video to actually play through. if the video stalls/buffers, the bar
-        // stalls with it. (only a real 'error' above can release it early.)
-      };
-
-      function settle() {
-        if (done) return;
-        done = true;
-        try { video.pause(); } catch (e) {}
-        if (percentEl) percentEl.textContent = '100%';
-        if (progressFill) progressFill.style.width = '100%';
-        const cb = onComplete;
-        onComplete = null;
-        if (cb) cb();
-      }
-
-      function animate() {
-        if (loaderEl.classList.contains('hidden')) return;
-        requestAnimationFrame(animate);
-        if (done) return;
-
-        // a truly broken asset can't "block" meaningfully — once the model is
-        // loaded, release the loader so the site isn't trapped behind a dead video.
-        if (finishing && videoBroken) { settle(); return; }
-
-        if (!(ready && duration)) return;
-
-        const ct = video.currentTime;
-        const gap = targetTime - ct;
-
-        if (gap > 0.05) {
-          // behind the target → play forward, faster the further behind we
-          // are. modulating playbackRate (vs. seeking) keeps it buttery.
-          const rate = finishing
-            ? Math.min(Math.max(gap * 1.5, 2), 6)   // download done: play out briskly
-            : Math.min(Math.max(gap * 2, 0.6), 5);  // tracking download: ease along
-          video.playbackRate = rate;
-          if (video.paused) video.play().catch(() => {});
-        } else if (gap <= 0) {
-          // caught up to the download → hold this frame until more arrives
-          if (!video.paused) { try { video.pause(); } catch (e) {} }
+      function show(value, message) {
+        // Once measurable, never reset the bar or move it backwards between stages.
+        if (value !== null) displayedProgress = Math.max(displayedProgress ?? 0, value);
+        value = displayedProgress;
+        status.textContent = message;
+        track.classList.toggle('indeterminate', value === null);
+        percent.textContent = value === null ? '…' : Math.floor(value) + '%';
+        if (value === null) track.removeAttribute('aria-valuenow');
+        else {
+          fill.style.width = value + '%';
+          track.setAttribute('aria-valuenow', String(Math.floor(value)));
+          target = value / 100;
         }
-
-        // the bar/number are driven SOLELY by the frame actually on screen, so
-        // they advance exactly as fast as the video plays. if the video blocks
-        // (buffering/stalled), currentTime stops → the bar stops with it.
-        const pct = Math.min((ct / duration) * 100, 100);
-        if (percentEl) percentEl.textContent = Math.round(pct) + '%';
-        if (progressFill) progressFill.style.width = pct + '%';
-
-        // only release once the video has GENUINELY played to the end.
-        if (finishing && (video.ended || duration - ct <= 0.05)) settle();
       }
-      animate();
+
+      function activity(nextState) {
+        state = nextState;
+        lastActivity = Date.now();
+        slow = false;
+        retry.hidden = true;
+      }
+
+      function cleanup() {
+        clearInterval(watchdog);
+        cancelAnimationFrame(frame);
+        video?.pause();
+        window.removeEventListener('error', onError, true);
+      }
+
+      const watchdog = setInterval(() => {
+        if (terminal() || slow || Date.now() - lastActivity < 20000) return;
+        slow = true;
+        status.textContent = navigator.onLine === false
+          ? 'You appear to be offline. Reconnect and try again.'
+          : 'This is taking longer than usual. You can wait or try again.';
+        retry.hidden = false;
+      }, 1000);
+
+      retry.addEventListener('click', () => location.reload());
+      show(null, 'Starting…');
+
+      window.sceneLoader = {
+        downloadStarted() {
+          if (terminal()) return;
+          activity('downloading');
+          show(null, 'Downloading scene…');
+        },
+        progress(loaded, total) {
+          if (terminal() || state === 'decoding' || state === 'preparing') return;
+          if (loaded > lastBytes) activity('downloading');
+          lastBytes = Math.max(lastBytes, loaded);
+          if (total > 0 && loaded >= total) {
+            this.decoding();
+            return;
+          }
+          // Download bytes are measurable; reserve the final portion for actual
+          // decode/setup/render milestones, never for a timer or video playback.
+          const value = total > 0 ? Math.min(loaded / total, 1) * 90 : null;
+          const mb = (loaded / 1048576).toFixed(1);
+          show(value, `Downloading scene — ${mb} MB received`);
+        },
+        decoding() {
+          if (terminal() || state === 'preparing') return;
+          if (state !== 'decoding') activity('decoding');
+          show(90, 'Unpacking scene…');
+        },
+        preparing() {
+          if (terminal()) return;
+          if (state !== 'preparing') activity('preparing');
+          show(95, 'Preparing scene…');
+        },
+        complete(callback) {
+          if (terminal()) return;
+          state = 'ready';
+          retry.hidden = true;
+          show(100, 'Ready');
+          cleanup();
+          setTimeout(() => {
+            loader.classList.add('hidden');
+            callback();
+          }, 250);
+        },
+        fail(error) {
+          if (terminal()) return;
+          console.error('Scene loading failed:', error);
+          state = 'failed';
+          cleanup();
+          track.classList.remove('indeterminate');
+          track.removeAttribute('aria-valuenow');
+          percent.textContent = 'Load failed';
+          status.textContent = 'The scene could not load. Please try again.';
+          retry.hidden = false;
+        }
+      };
+
+      // Includes failed module imports and synchronous startup/WebGL errors.
+      // Image/video errors are decorative and must not block the scene.
+      function onError(event) {
+        if (event.target?.tagName === 'SCRIPT' || event instanceof ErrorEvent) {
+          window.sceneLoader.fail(event.error || event.message || 'Script failed to load');
+        }
+      }
+      window.addEventListener('error', onError, true);
+
+      video?.addEventListener('error', () => { videoBroken = true; });
+      function animateTree() {
+        if (terminal()) return;
+        frame = requestAnimationFrame(animateTree);
+        if (!video || videoBroken || !(video.duration > 0) || !Number.isFinite(video.duration)) return;
+        const gap = target * video.duration - video.currentTime;
+        if (gap > 0.05) {
+          video.playbackRate = Math.min(Math.max(gap * 2, 0.6), 5);
+          if (video.paused && !playPending) {
+            playPending = true;
+            video.play().catch(() => { videoBroken = true; }).finally(() => { playPending = false; });
+          }
+        } else if (!video.paused) video.pause();
+      }
+      animateTree();
     })();
   </script>
 
@@ -2196,9 +2099,6 @@
     });
 
     // dom nodes
-    const loaderEl = document.getElementById('loader');
-    const progressFill = document.getElementById('progress-fill');
-    const percentEl = document.getElementById('loader-percent');
     const hintsEl = document.getElementById('controls-hint');
 
     // detect mobile for performance tuning
@@ -2650,104 +2550,85 @@
 
     let mixer;
 
+    window.sceneLoader.downloadStarted();
     gltfLoader.load(
       MODEL_URL,
       async (gltf) => {
-        console.log('[ANIM-DEBUG] gltf callback fired, animations:', gltf.animations.length,
-          gltf.animations.map(a => a.name));
-        const model = gltf.scene;
+        try {
+          window.sceneLoader.preparing();
+          console.log('[ANIM-DEBUG] gltf callback fired, animations:', gltf.animations.length,
+            gltf.animations.map(a => a.name));
+          const model = gltf.scene;
 
-        // wait for the perf tracker if it hasn't finished yet.
-        // it usually finishes well before the model downloads,
-        // but on fast connections it might still be benchmarking.
-        console.log('[ANIM-DEBUG] awaiting perfPromise...');
-        const perfResult = await perfPromise;
-        console.log('[ANIM-DEBUG] perfPromise resolved, result:', !!perfResult);
-        // update the dev panel with detection results
-        updatePerfPanel(perfResult);
+          // Optional hardware analysis must not hold a loaded scene indefinitely.
+          if (ENABLE_ADAPTIVE_QUALITY) {
+            const perfResult = await Promise.race([
+              perfPromise,
+              new Promise(resolve => setTimeout(() => resolve(null), 5000))
+            ]);
+            if (perfResult) updatePerfPanel(perfResult);
+          }
 
-        // crunch textures using the (possibly updated) MAX_TEX limit
-        shrinkAllTextures(model);
+          // crunch textures using the (possibly updated) MAX_TEX limit
+          shrinkAllTextures(model);
 
-        // force shadows on everything, kinda expensive but looks better
-        model.traverse(child => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            // Illuminate ONLY Mesh_0.003
-            if (child.name === 'Mesh_0.003') {
-              child.layers.enable(1);
-              if (child.material) {
-                // Force it to glow from within so it bypasses metallic darkness
-                child.material.emissive = new THREE.Color(0x553311); // Warm gold glow
-                child.material.emissiveIntensity = 2.0;
+          // force shadows on everything, kinda expensive but looks better
+          model.traverse(child => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              // Illuminate ONLY Mesh_0.003
+              if (child.name === 'Mesh_0.003') {
+                child.layers.enable(1);
+                if (child.material) {
+                  // Force it to glow from within so it bypasses metallic darkness
+                  child.material.emissive = new THREE.Color(0x553311); // Warm gold glow
+                  child.material.emissiveIntensity = 2.0;
+                }
               }
             }
-          }
-          if (child.isLight) {
-            child.intensity *= GLB_LIGHT_INTENSITY;
-            child.color.lerp(new THREE.Color(GLB_LIGHT_TINT), GLB_LIGHT_TINT_STRENGTH);
-          }
-        });
-
-        scene.add(model);
-
-        if (gltf.animations && gltf.animations.length > 0) {
-          console.log('[ANIM-DEBUG] creating mixer, clip count:', gltf.animations.length);
-          mixer = new THREE.AnimationMixer(model);
-          gltf.animations.forEach((clip, i) => {
-            const action = mixer.clipAction(clip);
-            action.play();
-            console.log('[ANIM-DEBUG] playing clip', i, clip.name,
-              'duration:', clip.duration, 'tracks:', clip.tracks.length);
+            if (child.isLight) {
+              child.intensity *= GLB_LIGHT_INTENSITY;
+              child.color.lerp(new THREE.Color(GLB_LIGHT_TINT), GLB_LIGHT_TINT_STRENGTH);
+            }
           });
-          console.log('[ANIM-DEBUG] mixer created, actions:', mixer._actions.length);
-        } else {
-          console.warn('[ANIM-DEBUG] NO ANIMATIONS in gltf.animations!',
-            'raw value:', gltf.animations);
-        }
 
-        // if adaptive quality is on and the perf tracker says this device
-        // can't handle the scene, adjust the firefly appearance
-        if (ENABLE_ADAPTIVE_QUALITY && adaptedQuality) {
-          const newCount = adaptedQuality.particles.fireflyCount;
-          if (newCount !== FIREFLY_COUNT && SHOW_FIREFLIES) {
-            ffMat.size = newCount > 200 ? 0.12 : 0.08;
-            ffMat.opacity = newCount > 200 ? 0.7 : 0.4;
+          scene.add(model);
+
+          if (gltf.animations && gltf.animations.length > 0) {
+            console.log('[ANIM-DEBUG] creating mixer, clip count:', gltf.animations.length);
+            mixer = new THREE.AnimationMixer(model);
+            gltf.animations.forEach((clip, i) => {
+              const action = mixer.clipAction(clip);
+              action.play();
+              console.log('[ANIM-DEBUG] playing clip', i, clip.name,
+                'duration:', clip.duration, 'tracks:', clip.tracks.length);
+            });
+            console.log('[ANIM-DEBUG] mixer created, actions:', mixer._actions.length);
+          } else {
+            console.warn('[ANIM-DEBUG] NO ANIMATIONS in gltf.animations!',
+              'raw value:', gltf.animations);
           }
-        }
 
-        // drive the tree to full growth, THEN fade out. completeLoaderVideo
-        // only calls back once the video has actually reached the end, so the
-        // 100% / fade can't happen while the tree is still growing.
-        const finishLoader = () => {
-          loaderEl.classList.add('hidden');
-          beginIntroAnimation();
-        };
-        if (window.completeLoaderVideo) {
-          // small hold so the fully-grown tree is visible before the fade
-          window.completeLoaderVideo(() => setTimeout(finishLoader, 400));
-        } else {
-          progressFill.style.width = '100%';
-          percentEl.textContent = '100%';
-          setTimeout(finishLoader, 1200);
+          // if adaptive quality is on and the perf tracker says this device
+          // can't handle the scene, adjust the firefly appearance
+          if (ENABLE_ADAPTIVE_QUALITY && adaptedQuality) {
+            const newCount = adaptedQuality.particles.fireflyCount;
+            if (newCount !== FIREFLY_COUNT && SHOW_FIREFLIES) {
+              ffMat.size = newCount > 200 ? 0.12 : 0.08;
+              ffMat.opacity = newCount > 200 ? 0.7 : 0.4;
+            }
+          }
+
+          // Render the prepared model before reporting success.
+          renderer.render(scene, camera);
+          window.sceneLoader.complete(beginIntroAnimation);
+        } catch (error) {
+          window.sceneLoader.fail(error);
         }
       },
-      (progress) => {
-        if (progress.total > 0) {
-          // cap at 99 during download so the number/tree only hit 100% once
-          // the model has fully loaded; the loader's animate loop owns the
-          // actual percent text + bar (driven by the eased video time).
-          const pct = Math.min((progress.loaded / progress.total) * 100, 99);
-          if (window.updateLoaderFrame) window.updateLoaderFrame(pct);
-        }
-      },
-      (err) => {
-        console.error('GLB load error:', err);
-        percentEl.textContent = 'Load failed';
-        const treeVid = document.getElementById('loader-tree-video');
-        if (treeVid) treeVid.style.opacity = '0.3';
-      }
+      (progress) => window.sceneLoader.progress(progress.loaded, progress.total),
+      (error) => window.sceneLoader.fail(error)
     );
 
     // ─── Intro camera dolly ───
