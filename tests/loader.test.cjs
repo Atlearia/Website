@@ -11,6 +11,7 @@ function setup() {
   let now = 0;
   let watchdog;
   let timeout;
+  let timeoutDelay;
   let animation;
   const document = {
     getElementById(id) {
@@ -42,12 +43,13 @@ function setup() {
     document, window, Date: { now: () => now }, navigator: { onLine: true },
     location: { reload() {} }, console: { error() {} }, ErrorEvent: class {},
     setInterval: callback => { watchdog = callback; return 1; }, clearInterval() {},
-    setTimeout: callback => { timeout = callback; },
+    setTimeout: (callback, delay) => { timeout = callback; timeoutDelay = delay; },
     requestAnimationFrame: callback => { animation = callback; return 1; }, cancelAnimationFrame() {}
   });
   return {
     loader: window.sceneLoader, get: id => document.getElementById(id), listeners,
-    tick() { now += 21000; watchdog(); }, finish() { timeout(); }, animate() { animation(); }
+    tick() { now += 21000; watchdog(); }, finish() { timeout(); }, animate() { animation(); },
+    finishDelay() { return timeoutDelay; }
   };
 }
 
@@ -59,22 +61,22 @@ test('download percentage works before video metadata arrives', () => {
   assert.equal(get('progress-fill').style.width, '22.5%');
 });
 
-test('unknown download size reports bytes without inventing a percentage', () => {
+test('unknown download size stays indeterminate without inventing a percentage', () => {
   const { loader, get } = setup();
   loader.progress(1048576, 0);
   assert.equal(get('loader-percent').textContent, '…');
-  assert.match(get('loader-status').textContent, /1.0 MB/);
+  assert.equal(get('loader-status').textContent, 'Loading…');
   assert.equal(get('loader-progress').attributes['aria-valuenow'], undefined);
 });
 
 test('download completion shows preparation until the scene is ready', () => {
   const { loader, get, finish } = setup();
   loader.progress(100, 100);
-  assert.equal(get('loader-status').textContent, 'Unpacking scene…');
+  assert.equal(get('loader-status').textContent, 'Almost ready…');
   assert.equal(get('loader-percent').textContent, '90%');
   assert.equal(get('loader-progress').classList.contains('indeterminate'), false);
   loader.preparing();
-  assert.equal(get('loader-status').textContent, 'Preparing scene…');
+  assert.equal(get('loader-status').textContent, 'Almost ready…');
   assert.equal(get('loader-percent').textContent, '95%');
   let calls = 0;
   loader.complete(() => calls++);
@@ -90,6 +92,20 @@ test('a video with no metadata cannot trap a ready scene', () => {
   loader.complete(() => {});
   finish();
   assert.equal(get('loader').classList.contains('hidden'), true);
+});
+
+test('a buffered video gets a bounded finish, even if playback never advances', () => {
+  const { loader, get, finish, finishDelay } = setup();
+  const video = get('loader-tree-video');
+  video.readyState = 4;
+  let pauses = 0;
+  video.pause = () => pauses++;
+  loader.complete(() => {});
+  assert.equal(pauses, 0, 'do not freeze the tree immediately at scene readiness');
+  assert.equal(finishDelay(), 600, 'entry must never depend on a video ended event');
+  finish();
+  assert.equal(get('loader').classList.contains('hidden'), true);
+  assert.equal(pauses, 1);
 });
 
 test('stalls expose retry and fresh download activity recovers', () => {
