@@ -1373,7 +1373,7 @@
   <div id="loader">
     <div class="loader-content">
       <div class="loader-art">
-        <video id="loader-tree-video" src="assets/tree-growth.mp4" poster="assets/tree-growth-start.webp" muted playsinline preload="auto"
+        <video id="loader-tree-video" src="assets/tree-sparks.mp4" poster="assets/tree-sparks-start.webp" muted playsinline preload="auto"
           disablepictureinpicture aria-hidden="true"></video>
       </div>
       <div class="loader-feedback">
@@ -2116,7 +2116,7 @@
         }
         frame = requestAnimationFrame(animateLoader);
         if (!video || videoBroken || !(video.duration > 0) || !Number.isFinite(video.duration)) return;
-        // This clip starts with visible branches; no dark lead-in or seek is
+        // This clip starts at the first yellow sparks; no dark lead-in or seek is
         // needed. Its matching poster stays visible while the video buffers.
         const gap = target * video.duration - video.currentTime;
         if (gap > 0.05) {
