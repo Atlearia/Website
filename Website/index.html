@@ -2047,10 +2047,11 @@
         }
       };
 
-      // Includes failed module imports and synchronous startup/WebGL errors.
-      // Image/video errors are decorative and must not block the scene.
+      // Only the scene module can fail the loader here. Analytics, extensions,
+      // and other unrelated scripts must not prevent a healthy scene opening.
+      // Scene imports and startup exceptions are caught by the module itself.
       function onError(event) {
-        if (event.target?.tagName === 'SCRIPT' || event instanceof ErrorEvent) {
+        if (event.target?.id === 'scene-module') {
           window.sceneLoader.fail(event.error || event.message || 'Script failed to load');
         }
       }
@@ -2084,15 +2085,18 @@
   }
   </script>
 
-  <script type="module">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-
-    // hardware detection + RAG quality pipeline
-    // runs during loading, picks quality settings based on the visitor's GPU
-    import { SystemPerfTracker, adaptForThreeJS, applyToRenderer } from './SystemPerfTracker/perf-tracker.js';
+  <script type="module" id="scene-module">
+    try {
+    // Catch dependency and startup failures explicitly, without treating errors
+    // from unrelated page scripts (including blocked analytics) as fatal.
+    const [THREE, { OrbitControls }, { GLTFLoader }, { DRACOLoader },
+      { SystemPerfTracker, adaptForThreeJS, applyToRenderer }] = await Promise.all([
+      import('three'),
+      import('three/addons/controls/OrbitControls.js'),
+      import('three/addons/loaders/GLTFLoader.js'),
+      import('three/addons/loaders/DRACOLoader.js'),
+      import('./SystemPerfTracker/perf-tracker.js')
+    ]);
 
     // ── KILL SWITCH ──
     // set to false to disable automatic quality changes.
@@ -2912,6 +2916,9 @@
     renderer.domElement.addEventListener('webglcontextrestored', () => {
       console.log('WebGL context restored');
     });
+    } catch (error) {
+      window.sceneLoader.fail(error);
+    }
   </script>
 </body>
 

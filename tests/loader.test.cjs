@@ -131,11 +131,23 @@ test('failure remains visible despite late progress, animation or completion', (
   assert.equal(get('loader').classList.contains('hidden'), false);
 });
 
-test('script failures surface an actionable error, decorative media failures do not', () => {
+test('blocked analytics and unrelated runtime errors cannot fail a healthy scene', () => {
+  const { loader, get, listeners, finish } = setup();
+  const onError = listeners.get('error');
+  onError({ target: { tagName: 'SCRIPT', src: 'https://static.cloudflareinsights.com/beacon.min.js' } });
+  onError({ message: 'Unrelated script threw', error: new Error('Optional script failed') });
+  loader.progress(50, 100);
+  assert.equal(get('loader-percent').textContent, '45%');
+  loader.complete(() => {});
+  finish();
+  assert.equal(get('loader').classList.contains('hidden'), true);
+});
+
+test('scene script failures surface an actionable error, decorative media failures do not', () => {
   const { get, listeners } = setup();
   const onError = listeners.get('error');
   onError({ target: { tagName: 'VIDEO' } });
   assert.notEqual(get('loader-percent').textContent, 'Load failed');
-  onError({ target: { tagName: 'SCRIPT' } });
+  onError({ target: { tagName: 'SCRIPT', id: 'scene-module' } });
   assert.equal(get('loader-percent').textContent, 'Load failed');
 });
