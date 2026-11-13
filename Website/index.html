@@ -129,13 +129,13 @@
       padding-top: 28px;
     }
 
-    /* thin golden progress bar */
+    /* A single frame-driven fill keeps the bar and number in sync. */
     .loader-progress-bar {
       margin-top: 12px;
-      width: clamp(140px, 20vw, 220px);
-      height: 1px;
-      background: rgba(232, 196, 124, 0.08);
-      border-radius: 1px;
+      width: clamp(160px, 24vw, 240px);
+      height: 3px;
+      background: rgba(232, 196, 124, 0.12);
+      border-radius: 999px;
       overflow: hidden;
       position: relative;
 
@@ -146,10 +146,12 @@
       top: 0;
       left: 0;
       height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, rgba(232, 196, 124, 0.4), rgba(255, 180, 80, 0.8));
-      border-radius: 1px;
-      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      width: 100%;
+      background: linear-gradient(90deg, #a78042, #e8c47c);
+      border-radius: inherit;
+      transform: scaleX(0);
+      transform-origin: left center;
+      will-change: transform;
     }
 
     /* Normal progress is visualized by the tree, percentage, and bar only.
@@ -1946,26 +1948,53 @@
       let lastActivity = Date.now();
       let lastBytes = 0;
       let target = 0;
-      let displayedProgress = null;
+      let targetProgress = null;
+      let displayedProgress = 0;
+      let lastFrameAt = Date.now();
+      let readyAt = 0;
+      let finishDelay = 0;
+      let finishTimer;
+      let onComplete;
       let frame;
       let slow = false;
       let playPending = false;
       let videoBroken = false;
       const terminal = () => state === 'ready' || state === 'failed';
 
+      function paintProgress() {
+        const rounded = Math.floor(displayedProgress);
+        percent.textContent = rounded + '%';
+        fill.style.transform = `scaleX(${displayedProgress / 100})`;
+        track.setAttribute('aria-valuenow', String(rounded));
+      }
+
       function show(value, message) {
-        // Once measurable, never reset the bar or move it backwards between stages.
-        if (value !== null) displayedProgress = Math.max(displayedProgress ?? 0, value);
-        value = displayedProgress;
+        // Network events may arrive in large bursts, especially from cache.
+        // Store measured milestones; the animation loop displays the distance
+        // between them without ever getting ahead of completed work.
+        if (value !== null) targetProgress = Math.max(targetProgress ?? 0, value);
         status.textContent = message;
-        track.classList.toggle('indeterminate', value === null);
-        percent.textContent = value === null ? '…' : Math.floor(value) + '%';
-        if (value === null) track.removeAttribute('aria-valuenow');
-        else {
-          fill.style.width = value + '%';
-          track.setAttribute('aria-valuenow', String(Math.floor(value)));
-          target = value / 100;
+        track.classList.toggle('indeterminate', targetProgress === null);
+        if (targetProgress === null) {
+          percent.textContent = '…';
+          track.removeAttribute('aria-valuenow');
+        } else {
+          target = targetProgress / 100;
+          paintProgress();
         }
+      }
+
+      function revealScene() {
+        if (state !== 'ready' || loader.classList.contains('hidden')) return;
+        // The timeout is a fallback for suspended animation frames (e.g. a
+        // background tab). It cannot mark an unready scene as complete.
+        displayedProgress = 100;
+        paintProgress();
+        loader.classList.add('hidden');
+        cleanup();
+        const callback = onComplete;
+        onComplete = null;
+        if (callback) callback();
       }
 
       function activity(nextState) {
@@ -1978,6 +2007,7 @@
 
       function cleanup() {
         clearInterval(watchdog);
+        clearTimeout(finishTimer);
         cancelAnimationFrame(frame);
         video?.pause();
         window.removeEventListener('error', onError, true);
@@ -2033,14 +2063,12 @@
           show(100, 'Ready');
           clearInterval(watchdog);
           window.removeEventListener('error', onError, true);
-          // Give a healthy video a short, bounded finish. Never wait for media
-          // events: a stalled/blocked video must not hold the scene hostage.
-          const finishDelay = video && !videoBroken && video.readyState >= 2 ? 600 : 200;
-          setTimeout(() => {
-            loader.classList.add('hidden');
-            cleanup();
-            callback();
-          }, finishDelay);
+          readyAt = Date.now();
+          onComplete = callback;
+          finishDelay = video && !videoBroken && video.readyState >= 2 ? 600 : 200;
+          // Normally the frame loop reveals at 100%. A hard upper bound keeps
+          // stalled video or suspended rAF from trapping an already-ready site.
+          finishTimer = setTimeout(revealScene, 1600);
         },
         fail(error) {
           if (terminal()) return;
@@ -2071,9 +2099,22 @@
       window.addEventListener('error', onError, true);
 
       video?.addEventListener('error', () => { videoBroken = true; });
-      function animateTree() {
+      function animateLoader() {
         if (state === 'failed' || loader.classList.contains('hidden')) return;
-        frame = requestAnimationFrame(animateTree);
+        const now = Date.now();
+        // Cap catch-up after long tasks so a paused main thread doesn't turn
+        // the next paint into a 20-to-100 jump. No speculative progress.
+        const delta = Math.min(Math.max(now - lastFrameAt, 0), 50);
+        lastFrameAt = now;
+        if (targetProgress !== null) {
+          displayedProgress = Math.min(targetProgress, displayedProgress + delta * 0.1);
+          paintProgress();
+        }
+        if (state === 'ready' && displayedProgress >= 100 && now - readyAt >= finishDelay) {
+          revealScene();
+          return;
+        }
+        frame = requestAnimationFrame(animateLoader);
         if (!video || videoBroken || !(video.duration > 0) || !Number.isFinite(video.duration)) return;
         // The first 2.8 seconds are mostly black. Start at the visible sprout,
         // then map real loading milestones over the actual growth sequence.
@@ -2087,7 +2128,7 @@
           }
         } else if (!video.paused) video.pause();
       }
-      animateTree();
+      animateLoader();
     })();
   </script>
 

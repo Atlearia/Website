@@ -42,23 +42,25 @@ function setup() {
   vm.runInNewContext(source, {
     document, window, Date: { now: () => now }, navigator: { onLine: true },
     location: { reload() {} }, console: { error() {} }, ErrorEvent: class {},
-    setInterval: callback => { watchdog = callback; return 1; }, clearInterval() {},
+    setInterval: callback => { watchdog = callback; return 1; }, clearInterval() {}, clearTimeout() {},
     setTimeout: (callback, delay) => { timeout = callback; timeoutDelay = delay; },
     requestAnimationFrame: callback => { animation = callback; return 1; }, cancelAnimationFrame() {}
   });
   return {
     loader: window.sceneLoader, get: id => document.getElementById(id), listeners,
-    tick() { now += 21000; watchdog(); }, finish() { timeout(); }, animate() { animation(); },
+    tick() { now += 21000; watchdog(); }, finish() { now += timeoutDelay; timeout(); },
+    animate(ms = 16) { now += ms; animation(); },
+    advance(ms) { for (let elapsed = 0; elapsed < ms; elapsed += 16) { now += Math.min(16, ms - elapsed); animation(); } },
     finishDelay() { return timeoutDelay; }
   };
 }
 
 test('download percentage works before video metadata arrives', () => {
-  const { loader, get, animate } = setup();
+  const { loader, get, advance } = setup();
   loader.progress(25, 100);
-  animate();
+  advance(250);
   assert.equal(get('loader-percent').textContent, '22%');
-  assert.equal(get('progress-fill').style.width, '22.5%');
+  assert.equal(get('progress-fill').style.transform, 'scaleX(0.225)');
 });
 
 test('unknown download size stays indeterminate without inventing a percentage', () => {
@@ -70,12 +72,14 @@ test('unknown download size stays indeterminate without inventing a percentage',
 });
 
 test('download completion shows preparation until the scene is ready', () => {
-  const { loader, get, finish } = setup();
+  const { loader, get, finish, advance } = setup();
   loader.progress(100, 100);
+  advance(1000);
   assert.equal(get('loader-status').textContent, 'Almost ready…');
   assert.equal(get('loader-percent').textContent, '90%');
   assert.equal(get('loader-progress').classList.contains('indeterminate'), false);
   loader.preparing();
+  advance(100);
   assert.equal(get('loader-status').textContent, 'Almost ready…');
   assert.equal(get('loader-percent').textContent, '95%');
   let calls = 0;
@@ -102,35 +106,39 @@ test('a buffered video gets a bounded finish, even if playback never advances', 
   video.pause = () => pauses++;
   loader.complete(() => {});
   assert.equal(pauses, 0, 'do not freeze the tree immediately at scene readiness');
-  assert.equal(finishDelay(), 600, 'entry must never depend on a video ended event');
+  assert.equal(finishDelay(), 1600, 'entry must never depend on a video ended event');
   finish();
   assert.equal(get('loader').classList.contains('hidden'), true);
   assert.equal(pauses, 1);
 });
 
 test('stalls expose retry and fresh download activity recovers', () => {
-  const { loader, get, tick } = setup();
+  const { loader, get, tick, advance } = setup();
   loader.downloadStarted();
   tick();
   assert.equal(get('loader-retry').hidden, false);
   assert.match(get('loader-status').textContent, /longer than usual/);
   loader.progress(50, 100);
+  advance(500);
   assert.equal(get('loader-retry').hidden, true);
   assert.equal(get('loader-percent').textContent, '45%');
 });
 
 test('progress never resets when totals disappear or late download events arrive', () => {
-  const { loader, get } = setup();
+  const { loader, get, advance } = setup();
   loader.progress(80, 100);
+  advance(800);
   assert.equal(get('loader-percent').textContent, '72%');
   loader.progress(85, 0);
   assert.equal(get('loader-percent').textContent, '72%');
   loader.progress(90, 200);
   assert.equal(get('loader-percent').textContent, '72%');
   loader.decoding();
+  advance(200);
   loader.progress(95, 100);
   assert.equal(get('loader-percent').textContent, '90%');
   loader.preparing();
+  advance(100);
   loader.decoding();
   assert.equal(get('loader-percent').textContent, '95%');
   assert.equal(get('loader-progress').classList.contains('indeterminate'), false);
@@ -148,11 +156,12 @@ test('failure remains visible despite late progress, animation or completion', (
 });
 
 test('blocked analytics and unrelated runtime errors cannot fail a healthy scene', () => {
-  const { loader, get, listeners, finish } = setup();
+  const { loader, get, listeners, finish, advance } = setup();
   const onError = listeners.get('error');
   onError({ target: { tagName: 'SCRIPT', src: 'https://static.cloudflareinsights.com/beacon.min.js' } });
   onError({ message: 'Unrelated script threw', error: new Error('Optional script failed') });
   loader.progress(50, 100);
+  advance(500);
   assert.equal(get('loader-percent').textContent, '45%');
   loader.complete(() => {});
   finish();
@@ -166,4 +175,52 @@ test('scene script failures surface an actionable error, decorative media failur
   assert.notEqual(get('loader-percent').textContent, 'Load failed');
   onError({ target: { tagName: 'SCRIPT', id: 'scene-module' } });
   assert.equal(get('loader-percent').textContent, 'Load failed');
+});
+
+
+test('a sparse 20-to-100 burst paints intermediate values with bar and number synchronized', () => {
+  const { loader, get, advance, animate } = setup();
+  loader.progress(20, 90);
+  advance(250);
+  assert.equal(get('loader-percent').textContent, '20%');
+  loader.decoding();
+  loader.preparing();
+  let calls = 0;
+  loader.complete(() => calls++);
+  assert.equal(get('loader-percent').textContent, '20%', 'new target must not jump the displayed number');
+  let previous = 20;
+  const values = [];
+  for (let i = 0; i < 65; i++) {
+    animate();
+    const value = Number.parseInt(get('loader-percent').textContent);
+    const scale = Number(get('progress-fill').style.transform.match(/scaleX\((.+)\)/)[1]);
+    assert.ok(scale * 100 >= value - 1e-8 && scale * 100 < value + 1 + 1e-8);
+    assert.ok(value >= previous && value - previous <= 2, 'no skipped stretch of progress');
+    values.push(value);
+    previous = value;
+  }
+  assert.ok(values.some(value => value > 40 && value < 60));
+  assert.equal(previous, 100);
+  assert.equal(calls, 1);
+  assert.equal(get('loader').classList.contains('hidden'), true);
+});
+
+test('smoothing stops at real progress and cannot finish an unready scene', () => {
+  const { loader, get, advance } = setup();
+  loader.progress(20, 90);
+  advance(5000);
+  assert.equal(get('loader-percent').textContent, '20%');
+  loader.preparing();
+  advance(5000);
+  assert.equal(get('loader-percent').textContent, '95%');
+  assert.equal(get('loader').classList.contains('hidden'), false);
+});
+
+test('a long main-thread pause does not cause a jump on the next animation frame', () => {
+  const { loader, get, advance, animate } = setup();
+  loader.progress(20, 90);
+  advance(250);
+  loader.preparing();
+  animate(3000);
+  assert.equal(get('loader-percent').textContent, '25%');
 });
