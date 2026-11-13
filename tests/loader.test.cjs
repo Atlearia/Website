@@ -19,8 +19,9 @@ function setup() {
         const classes = new Set();
         nodes.set(id, {
           textContent: '', style: {}, hidden: true, attributes: {},
-          duration: 0, currentTime: 0, paused: true,
-          pause() {},
+          duration: 0, currentTime: 0, paused: true, complete: true, naturalWidth: 1920,
+          pause() { this.paused = true; },
+          play() { this.paused = false; return Promise.resolve(); },
           addEventListener() {},
           setAttribute(key, value) { this.attributes[key] = value; },
           removeAttribute(key) { delete this.attributes[key]; },
@@ -42,13 +43,22 @@ function setup() {
   vm.runInNewContext(source, {
     document, window, Date: { now: () => now }, navigator: { onLine: true },
     location: { reload() {} }, console: { error() {} }, ErrorEvent: class {},
-    setInterval: callback => { watchdog = callback; return 1; }, clearInterval() {}, clearTimeout() {},
+    setInterval: callback => { watchdog = callback; return 1; }, clearInterval() {},
+    clearTimeout() { timeout = undefined; },
     setTimeout: (callback, delay) => { timeout = callback; timeoutDelay = delay; },
     requestAnimationFrame: callback => { animation = callback; return 1; }, cancelAnimationFrame() {}
   });
   return {
     loader: window.sceneLoader, get: id => document.getElementById(id), listeners,
-    tick() { now += 21000; watchdog(); }, finish() { now += timeoutDelay; timeout(); },
+    tick() { now += 21000; watchdog(); },
+    finish() {
+      for (let i = 0; timeout && i < 10; i++) {
+        now += timeoutDelay;
+        const callback = timeout;
+        timeout = undefined;
+        callback();
+      }
+    },
     animate(ms = 16) { now += ms; animation(); },
     advance(ms) { for (let elapsed = 0; elapsed < ms; elapsed += 16) { now += Math.min(16, ms - elapsed); animation(); } },
     finishDelay() { return timeoutDelay; }
@@ -106,10 +116,10 @@ test('a buffered video gets a bounded finish, even if playback never advances', 
   video.pause = () => pauses++;
   loader.complete(() => {});
   assert.equal(pauses, 0, 'do not freeze the tree immediately at scene readiness');
-  assert.equal(finishDelay(), 1600, 'entry must never depend on a video ended event');
+  assert.equal(finishDelay(), 4000, 'entry must never depend on a video ended event');
   finish();
   assert.equal(get('loader').classList.contains('hidden'), true);
-  assert.equal(pauses, 1);
+  assert.ok(pauses >= 1);
 });
 
 test('stalls expose retry and fresh download activity recovers', () => {
@@ -223,4 +233,97 @@ test('a long main-thread pause does not cause a jump on the next animation frame
   loader.preparing();
   animate(3000);
   assert.equal(get('loader-percent').textContent, '25%');
+});
+
+test('E is shown at 100%, then the outro plays at normal speed before entry', () => {
+  const { loader, get, advance, animate } = setup();
+  const video = get('loader-tree-video');
+  const selectedFrame = get('loader-tree-complete');
+  video.readyState = 4;
+  video.duration = 6.4;
+  video.currentTime = 5.1;
+  loader.preparing();
+  advance(1000);
+  let calls = 0;
+  loader.complete(() => calls++);
+  advance(1000);
+  assert.equal(get('loader-percent').textContent, '99%', '100% must wait for E');
+  assert.equal(get('loader').classList.contains('hidden'), false);
+  video.currentTime = 5.45;
+  animate();
+  assert.equal(get('loader-percent').textContent, '100%');
+  assert.equal(selectedFrame.hidden, false, 'exact E frame must be visible with 100%');
+  assert.equal(video.currentTime, 5.4, 'outro starts from selected E, not an overshot frame');
+  advance(150);
+  assert.equal(selectedFrame.hidden, false);
+  assert.equal(calls, 0);
+  advance(100);
+  assert.equal(selectedFrame.hidden, true);
+  assert.equal(video.playbackRate, 1);
+  assert.equal(video.paused, false);
+  video.currentTime = 6.3;
+  animate();
+  assert.equal(get('loader-percent').textContent, '100%');
+  assert.equal(calls, 0, 'website stays covered through F');
+  video.currentTime = 6.4;
+  video.ended = true;
+  animate();
+  assert.equal(calls, 1);
+  assert.equal(get('loader').classList.contains('hidden'), true);
+});
+
+test('a stalled video falls back to E at 100% and cannot trap the ready site', () => {
+  const { loader, get, advance, finish } = setup();
+  const video = get('loader-tree-video');
+  video.readyState = 4;
+  video.duration = 6.4;
+  video.currentTime = 0;
+  loader.complete(() => {});
+  advance(1200);
+  assert.equal(get('loader-percent').textContent, '99%');
+  finish();
+  assert.equal(get('loader-tree-complete').hidden, false);
+  assert.equal(get('loader-percent').textContent, '100%');
+  assert.equal(get('loader').classList.contains('hidden'), true);
+});
+
+test('buffering at E keeps the 100% frame visible until the outro can play', () => {
+  const { loader, get, advance, animate } = setup();
+  const video = get('loader-tree-video');
+  video.readyState = 4;
+  video.duration = 6.4;
+  video.currentTime = 5.4;
+  let calls = 0;
+  loader.complete(() => calls++);
+  advance(1050);
+  assert.equal(get('loader-percent').textContent, '100%');
+  video.seeking = true;
+  video.readyState = 1;
+  advance(300);
+  assert.equal(get('loader-tree-complete').hidden, false);
+  assert.equal(calls, 0);
+  video.seeking = false;
+  video.readyState = 4;
+  animate();
+  assert.equal(get('loader-tree-complete').hidden, true);
+  assert.equal(video.playbackRate, 1);
+  assert.equal(calls, 0);
+  video.currentTime = 6.4;
+  video.ended = true;
+  animate();
+  assert.equal(calls, 1);
+});
+
+test('the playback pause tolerance cannot leave completion stuck just before E', () => {
+  const { loader, get, advance, finishDelay } = setup();
+  const video = get('loader-tree-video');
+  video.readyState = 4;
+  video.duration = 6.4;
+  video.currentTime = 5.36;
+  loader.complete(() => {});
+  advance(1050);
+  assert.equal(get('loader-percent').textContent, '100%');
+  assert.equal(get('loader-tree-complete').hidden, false);
+  assert.equal(video.currentTime, 5.4);
+  assert.equal(finishDelay(), 2500, 'the outro gets a separate bounded playback window');
 });

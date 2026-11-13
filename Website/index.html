@@ -86,6 +86,7 @@
     }
 
     .loader-art {
+      position: relative;
       width: min(92vw, 62svh, 520px);
       aspect-ratio: 1;
       overflow: hidden;
@@ -93,7 +94,8 @@
       isolation: isolate;
     }
 
-    #loader-tree-video {
+    #loader-tree-video,
+    #loader-tree-complete {
       display: block;
       width: 100%;
       height: 100%;
@@ -101,6 +103,13 @@
       transform: scale(1.12);
       pointer-events: none;
     }
+
+    #loader-tree-complete {
+      position: absolute;
+      inset: 0;
+    }
+
+    #loader-tree-complete[hidden] { display: none; }
 
     .loader-feedback {
       position: relative;
@@ -1375,6 +1384,7 @@
       <div class="loader-art">
         <video id="loader-tree-video" src="assets/tree-sparks.mp4" poster="assets/tree-sparks-start.webp" muted playsinline preload="auto"
           disablepictureinpicture aria-hidden="true"></video>
+        <img id="loader-tree-complete" src="assets/tree-complete-e.webp" alt="" aria-hidden="true" hidden>
       </div>
       <div class="loader-feedback">
         <div class="loader-percent" id="loader-percent">…</div>
@@ -1934,11 +1944,14 @@
   </script>
 
   <!-- Estimated overall progress: download 0–90%, decode 90–95%, first render 95–100%.
-       The tree is decorative and never gates entry. -->
+       Frame E marks 100%, followed by the remaining sparkle animation.
+       A bounded fallback keeps failed media from blocking entry. -->
   <script id="loading-controller">
     (() => {
       const loader = document.getElementById('loader');
       const video = document.getElementById('loader-tree-video');
+      const completeFrame = document.getElementById('loader-tree-complete');
+      const TREE_COMPLETE_TIME = 5.4; // User-selected frame E in tree-sparks.mp4.
       const percent = document.getElementById('loader-percent');
       const track = document.getElementById('loader-progress');
       const fill = document.getElementById('progress-fill');
@@ -1951,8 +1964,9 @@
       let targetProgress = null;
       let displayedProgress = 0;
       let lastFrameAt = Date.now();
-      let readyAt = 0;
-      let finishDelay = 0;
+      let completionShownAt = null;
+      let outroStarted = false;
+      let outroAvailable = false;
       let finishTimer;
       let onComplete;
       let frame;
@@ -1982,6 +1996,35 @@
           target = targetProgress / 100;
           paintProgress();
         }
+      }
+
+      function canPlayTree() {
+        return video && !videoBroken && video.readyState >= 2 &&
+          Number.isFinite(video.duration) && video.duration > 0;
+      }
+
+      function showCompletionFrame(now) {
+        if (completionShownAt !== null) return;
+        completionShownAt = now;
+        displayedProgress = 100;
+        paintProgress();
+        video?.pause();
+        // Display the exact selected frame alongside 100%, even if playback
+        // overshot by a frame or the decorative video failed to load.
+        if (completeFrame?.complete && completeFrame.naturalWidth > 0) completeFrame.hidden = false;
+        outroAvailable = canPlayTree();
+        if (outroAvailable) video.currentTime = Math.min(TREE_COMPLETE_TIME, video.duration);
+        // Give the outro its own deadline; time spent reaching E must not
+        // consume the final second of sparkle playback.
+        clearTimeout(finishTimer);
+        finishTimer = setTimeout(revealScene, 2500);
+      }
+
+      function finishFallback() {
+        if (state !== 'ready' || loader.classList.contains('hidden')) return;
+        if (completionShownAt === null) {
+          showCompletionFrame(Date.now());
+        } else revealScene();
       }
 
       function revealScene() {
@@ -2063,12 +2106,11 @@
           show(100, 'Ready');
           clearInterval(watchdog);
           window.removeEventListener('error', onError, true);
-          readyAt = Date.now();
           onComplete = callback;
-          finishDelay = video && !videoBroken && video.readyState >= 2 ? 600 : 200;
-          // Normally the frame loop reveals at 100%. A hard upper bound keeps
-          // stalled video or suspended rAF from trapping an already-ready site.
-          finishTimer = setTimeout(revealScene, 1600);
+          // Normal sequence: frame E + 100%, a short hold, then the remaining
+          // one-second sparkle outro at its original speed. This deadline is
+          // only for stalled media or suspended animation frames.
+          finishTimer = setTimeout(finishFallback, 4000);
         },
         fail(error) {
           if (terminal()) return;
@@ -2106,24 +2148,53 @@
         // the next paint into a 20-to-100 jump. No speculative progress.
         const delta = Math.min(Math.max(now - lastFrameAt, 0), 50);
         lastFrameAt = now;
+        if (completionShownAt !== null) {
+          if (now - completionShownAt >= 200) {
+            if (!outroAvailable || videoBroken || video.duration <= TREE_COMPLETE_TIME) {
+              revealScene();
+              return;
+            }
+            if (!outroStarted && !video.seeking && video.readyState >= 2) {
+              outroStarted = true;
+              if (completeFrame) completeFrame.hidden = true;
+              video.playbackRate = 1;
+              video.play().catch(() => { videoBroken = true; });
+            }
+            if (outroStarted && (video.ended || video.duration - video.currentTime <= 0.02)) {
+              revealScene();
+              return;
+            }
+          }
+          frame = requestAnimationFrame(animateLoader);
+          return;
+        }
         if (targetProgress !== null) {
-          displayedProgress = Math.min(targetProgress, displayedProgress + delta * 0.1);
+          // Match the playback hold tolerance below so we can't pause just
+          // shy of E forever. The exact E image covers the final sub-frame gap.
+          const beforeE = canPlayTree() && video.currentTime < Math.min(TREE_COMPLETE_TIME, video.duration) - 0.06;
+          const displayTarget = state === 'ready' && beforeE ? Math.min(targetProgress, 99) : targetProgress;
+          displayedProgress = Math.max(displayedProgress, Math.min(displayTarget, displayedProgress + delta * 0.1));
           paintProgress();
         }
-        if (state === 'ready' && displayedProgress >= 100 && now - readyAt >= finishDelay) {
-          revealScene();
+        if (state === 'ready' && displayedProgress >= 100) {
+          showCompletionFrame(now);
+          frame = requestAnimationFrame(animateLoader);
           return;
         }
         frame = requestAnimationFrame(animateLoader);
         if (!video || videoBroken || !(video.duration > 0) || !Number.isFinite(video.duration)) return;
         // This clip starts at the first yellow sparks; no dark lead-in or seek is
         // needed. Its matching poster stays visible while the video buffers.
-        const gap = target * video.duration - video.currentTime;
+        const gap = target * Math.min(TREE_COMPLETE_TIME, video.duration) - video.currentTime;
         if (gap > 0.05) {
-          video.playbackRate = state === 'ready' ? 12 : Math.min(Math.max(gap * 4, 0.6), 8);
+          // Avoid overwhelming video decoding while WebGL is also rendering.
+          video.playbackRate = Math.min(Math.max(gap * 4, 0.6), 4);
           if (video.paused && !playPending) {
             playPending = true;
-            video.play().catch(() => { videoBroken = true; }).finally(() => { playPending = false; });
+            video.play().catch(error => {
+              // Pausing to hold a progress frame can cancel a pending play().
+              if (error.name !== 'AbortError') videoBroken = true;
+            }).finally(() => { playPending = false; });
           }
         } else if (!video.paused) video.pause();
       }
